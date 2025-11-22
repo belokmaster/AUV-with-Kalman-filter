@@ -6,6 +6,10 @@ import math
 
 app = FastAPI()
 
+# ==========================================
+#  МАТРИЧНАЯ БИБЛИОТЕКА (Handmade / No NumPy)
+# ==========================================
+
 def zeros(rows, cols):
     return [[0.0 for _ in range(cols)] for _ in range(rows)]
 
@@ -37,7 +41,8 @@ def mat_sub(A, B):
 def mat_mul(A, B):
     # A: m x n, B: n x p -> C: m x p
     m = len(A); n = len(A[0]); n2 = len(B); p = len(B[0])
-    assert n == n2, "mat_mul dims"
+    # Простейшая проверка размерностей
+    if n != n2: return zeros(m, p) 
     C = zeros(m, p)
     for i in range(m):
         ai = A[i]
@@ -47,19 +52,6 @@ def mat_mul(A, B):
             for j in range(p):
                 C[i][j] += aik * bk[j]
     return C
-
-def mat_vec_mul(A, v):
-    # A: m x n, v: n x 1 (list)
-    m = len(A); n = len(A[0])
-    assert n == len(v)
-    res = [0.0]*m
-    for i in range(m):
-        s = 0.0
-        ai = A[i]
-        for j in range(n):
-            s += ai[j] * v[j]
-        res[i] = s
-    return res
 
 def transpose(A):
     r = len(A); c = len(A[0])
@@ -77,13 +69,12 @@ def scalar_mult(A, s):
             B[i][j] = A[i][j] * s
     return B
 
-#  LUP-разложение 
+# --- LUP Decomposition & Solver for Inversion ---
 def lup_decompose(A):
     n = len(A)
     LU = mat_copy(A)
     perm = list(range(n))
     for k in range(n):
-
         pivot = k
         maxv = abs(LU[k][k])
         for i in range(k+1, n):
@@ -91,203 +82,230 @@ def lup_decompose(A):
                 maxv = abs(LU[i][k])
                 pivot = i
         if maxv < 1e-12:
-            raise ValueError("Matrix is singular to working precision")
+            # Сингулярность (или близко к ней), просто вернем что есть
+            pass 
         if pivot != k:
             LU[k], LU[pivot] = LU[pivot], LU[k]
             perm[k], perm[pivot] = perm[pivot], perm[k]
-        # Eliminate
         for i in range(k+1, n):
-            LU[i][k] = LU[i][k] / LU[k][k]
-            for j in range(k+1, n):
-                LU[i][j] -= LU[i][k] * LU[k][j]
+            if abs(LU[k][k]) > 1e-12:
+                LU[i][k] = LU[i][k] / LU[k][k]
+                for j in range(k+1, n):
+                    LU[i][j] -= LU[i][k] * LU[k][j]
     return LU, perm
 
 def lup_solve(LU, perm, b):
-    # Solve LU x = Pb. b can be a vector (len n) or matrix n x m (list of rows)
     n = len(LU)
-    # apply permutation to b
-    if isinstance(b[0], list):
-        # matrix
-        m = len(b[0])
-        pb = [b[perm[i]][:] for i in range(n)]
-    else:
-        # vector
-        pb = [b[perm[i]] for i in range(n)]
-
-    # forward solve Ly = pb
-    if isinstance(pb[0], list):
-        m = len(pb[0])
-        y = zeros(n, m)
-        for i in range(n):
-            for j in range(m):
-                s = pb[i][j]
-                for k in range(i):
-                    s -= LU[i][k] * y[k][j]
-                y[i][j] = s
-    else:
-        y = [0.0]*n
-        for i in range(n):
-            s = pb[i]
-            for k in range(i):
-                s -= LU[i][k] * y[k]
-            y[i] = s
-
-    # backward solve Ux = y
-    if isinstance(y[0], list):
-        m = len(y[0])
-        x = zeros(n, m)
-        for i in range(n-1, -1, -1):
-            for j in range(m):
-                s = y[i][j]
-                for k in range(i+1, n):
-                    s -= LU[i][k] * x[k][j]
-                x[i][j] = s / LU[i][i]
-    else:
-        x = [0.0]*n
-        for i in range(n-1, -1, -1):
-            s = y[i]
-            for k in range(i+1, n):
-                s -= LU[i][k] * x[k]
+    # Permute b
+    pb = [b[perm[i]] for i in range(n)]
+    # Forward (Ly = pb)
+    y = [0.0]*n
+    for i in range(n):
+        s = pb[i]
+        for k in range(i):
+            s -= LU[i][k] * y[k]
+        y[i] = s
+    # Backward (Ux = y)
+    x = [0.0]*n
+    for i in range(n-1, -1, -1):
+        s = y[i]
+        for k in range(i+1, n):
+            s -= LU[i][k] * x[k]
+        if abs(LU[i][i]) > 1e-12:
             x[i] = s / LU[i][i]
+        else:
+            x[i] = 0.0
     return x
 
 def invert_matrix(A):
-    # A: n x n, return inverse n x n using LUP
     n = len(A)
     LU, perm = lup_decompose(A)
-    # build identity as matrix of columns for RHS
-    I = zeros(n, n)
-    for i in range(n):
-        I[i][i] = 1.0
-    # lup_solve expects b as rows; we need to pass columns transposed; easier: solve for each column of identity
     invA = zeros(n, n)
+    I = eye(n)
     for col in range(n):
-        # build b vector as column of I
         b = [I[i][col] for i in range(n)]
-        x = lup_solve(LU, perm, b)  # vector
+        x = lup_solve(LU, perm, b)
         for i in range(n):
             invA[i][col] = x[i]
     return invA
 
-# -------------------------
-#  Вспомогательные преобразования (векторы <-> матрицы)
-# -------------------------
 def vec_to_col(v):
     return [[x] for x in v]
 
 def col_to_vec(col):
     return [row[0] for row in col]
 
-# -------------------------
-#  LKF (ручной)
-# -------------------------
+
+# ==========================================
+#  Linear Kalman Filter (LKF)
+# ==========================================
 class LKF:
     def __init__(self, dt, process_noise, meas_noise):
         self.dt = dt
-        # state vector as column (6x1)
-        self.x = vec_to_col([0.0, 0.0, 5.0, 0.0, 0.0, 0.0])  # start z=5
-        # F 6x6
+        # Состояние: [x, y, z, vx, vy, vz]
+        self.x = vec_to_col([0.0, 0.0, 5.0, 0.0, 0.0, 0.0])
+        
+        # Матрица перехода (Constant Velocity Model)
+        # x_new = x + vx*dt
         self.F = eye(6)
-        self.F[0][3] = dt
-        self.F[1][4] = dt
-        self.F[2][5] = dt
-        # H 3x6
+        self.F[0][3] = dt; self.F[1][4] = dt; self.F[2][5] = dt
+        
+        # Матрица наблюдений (мы измеряем только координаты x,y,z)
         self.H = zeros(3, 6)
-        self.H[0][0] = 1.0
-        self.H[1][1] = 1.0
-        self.H[2][2] = 1.0
-        # Covariances
-        self.P = scalar_mult(eye(6), 100.0)
+        self.H[0][0] = 1.0; self.H[1][1] = 1.0; self.H[2][2] = 1.0
+        
+        # Ковариация ошибки P (начальная неуверенность)
+        self.P = scalar_mult(eye(6), 50.0)
+        
+        # Шум процесса Q (насколько мы не доверяем нашей модели "постоянной скорости")
+        # У нас теперь есть ускорение, которого модель не знает, поэтому Q нужен побольше
         self.Q = scalar_mult(eye(6), process_noise)
+        
+        # Шум измерений R
         self.R = scalar_mult(eye(3), meas_noise)
 
     def predict(self):
-        # x = F x
-        self.x = mat_mul(self.F, self.x)  # 6x6 * 6x1 -> 6x1
-        # P = F P F^T + Q
-        self.P = mat_add(mat_mul(mat_mul(self.F, self.P), transpose(self.F)), self.Q)
-        # floor on z
-        if self.x[2][0] < 1.0:
-            self.x[2][0] = 1.0
+        # 1. x = F * x
+        self.x = mat_mul(self.F, self.x)
+        
+        # 2. P = F * P * F^T + Q
+        FP = mat_mul(self.F, self.P)
+        FPFt = mat_mul(FP, transpose(self.F))
+        self.P = mat_add(FPFt, self.Q)
+        
+        # Ограничение, чтобы фильтр не улетал под землю (необязательно, но полезно для визуала)
+        if self.x[2][0] < 0.0: self.x[2][0] = 0.0
+            
         return col_to_vec(self.x)
 
     def update(self, z_meas):
-        # z_meas: list len 3
-        z = vec_to_col(z_meas)  # 3x1
-        # y = z - H x
-        Hx = mat_mul(self.H, self.x)  # 3x1
-        y = mat_sub(z, Hx)  # 3x1
-        # S = H P H^T + R  (3x3)
-        S = mat_add(mat_mul(mat_mul(self.H, self.P), transpose(self.H)), self.R)
-        # PHt = P H^T  (6x3)
-        PHt = mat_mul(self.P, transpose(self.H))
-        # invS via LUP
-        invS = invert_matrix(S)  # 3x3
-        # K = PHt * invS  (6x3)
-        K = mat_mul(PHt, invS)
-        # x = x + K y
-        Ky = mat_mul(K, y)  # 6x1
+        z = vec_to_col(z_meas) # Измерения
+        
+        # y = z - H * x (Innovation)
+        Hx = mat_mul(self.H, self.x)
+        y = mat_sub(z, Hx)
+        
+        # S = H * P * H^T + R (Innovation Covariance)
+        HPHt = mat_mul(mat_mul(self.H, self.P), transpose(self.H))
+        S = mat_add(HPHt, self.R)
+        
+        # K = P * H^T * inv(S) (Kalman Gain)
+        invS = invert_matrix(S)
+        K = mat_mul(mat_mul(self.P, transpose(self.H)), invS)
+        
+        # x = x + K * y
+        Ky = mat_mul(K, y)
         self.x = mat_add(self.x, Ky)
-        # P = (I - K H) P
-        I6 = eye(6)
-        KH = mat_mul(K, self.H)  # 6x6
-        IminusKH = mat_sub(I6, KH)
-        self.P = mat_mul(IminusKH, self.P)
+        
+        # P = (I - K * H) * P
+        I = eye(6)
+        KH = mat_mul(K, self.H)
+        ImKH = mat_sub(I, KH)
+        self.P = mat_mul(ImKH, self.P)
+        
         return col_to_vec(self.x)
 
-# -------------------------
-#  AUV Simulator (без numpy)
-# -------------------------
+
+# ==========================================
+#  AUV Simulator (Dynamic Model)
+# ==========================================
 class AUVSimulator:
     def __init__(self, dt):
         self.dt = dt
-        self.true_pos = [0.0, 0.0, 5.0]  # x,y,z
-        self.velocity_cmd = [0.0, 0.0, 0.0]
-        self.current_drift = [0.0, 0.0, 0.0]
+        self.pos = [0.0, 0.0, 5.0]   # Позиция (истина)
+        self.vel = [0.0, 0.0, 0.0]   # Скорость (в системе координат земли)
+        
+        # Входы управления (Сила тяги)
+        self.force_cmd = [0.0, 0.0, 0.0] 
+        # Вектор течения
+        self.drift_vel = [0.0, 0.0, 0.0]
+        
         self.noise_std = 2.0
         self.radius = 1.0
 
-    def step(self):
-        total_vel = [self.velocity_cmd[i] + self.current_drift[i] for i in range(3)]
-        new_pos = [self.true_pos[i] + total_vel[i]*self.dt for i in range(3)]
-        # collision with bottom
-        if new_pos[2] < self.radius:
-            new_pos[2] = self.radius
-            if total_vel[2] < 0:
-                total_vel[2] = 0.0
-        self.true_pos = new_pos
-        # gaussian noise (Box-Muller)
-        def gauss(mu, sigma):
-            # simple Box-Muller
-            u1 = random.random()
-            u2 = random.random()
-            z0 = math.sqrt(-2.0*math.log(max(u1, 1e-12))) * math.cos(2*math.pi*u2)
-            return mu + z0 * sigma
-        noise = [gauss(0.0, self.noise_std) for _ in range(3)]
-        measured_pos = [self.true_pos[i] + noise[i] for i in range(3)]
-        return {
-            "true_x": float(self.true_pos[0]),
-            "true_y": float(self.true_pos[1]),
-            "true_z": float(self.true_pos[2]),
-            "meas_x": float(measured_pos[0]),
-            "meas_y": float(measured_pos[1]),
-            "meas_z": float(measured_pos[2]),
-            "total_vx": float(total_vel[0]),
-            "total_vy": float(total_vel[1]),
-            "total_vz": float(total_vel[2])
-        }
+        # --- ФИЗИЧЕСКИЕ КОНСТАНТЫ ---
+        self.mass = 15.0        # Масса аппарата (кг). Создает инерцию.
+        self.drag_coeff = 3.0   # Коэф. вязкого трения (кг/с). Чем выше, тем труднее плыть.
+        self.thrust_factor = 8.0 # Усиление джойстика (чтобы были силы побольше)
 
     def update_params(self, vx, vy, vz, dx, dy, dz, noise):
-        self.velocity_cmd = [vx, vy, vz]
-        self.current_drift = [dx, dy, dz]
+        # Интерпретируем вход джойстика как КОМАНДУ ТЯГИ, а не скорости
+        # vx, vy с джойстика обычно от -3 до 3
+        self.force_cmd = [
+            vx * self.thrust_factor, 
+            vy * self.thrust_factor, 
+            vz * self.thrust_factor
+        ]
+        # Течение остается скоростью (упрощение)
+        self.drift_vel = [dx, dy, dz]
         self.noise_std = noise
 
-# -------------------------
-#  Инстансы и FastAPI endpoint (API тот же)
-# -------------------------
+    def step(self):
+        # Симуляция пошаговой физики: Эйлерово интегрирование
+        
+        # Истинная скорость относительно земли (для возврата)
+        true_vel_vector = [0.0]*3 
+
+        for i in range(3):
+            # 1. Сила сопротивления (направлена против скорости)
+            # F_drag = - k * v
+            f_drag = -self.drag_coeff * self.vel[i]
+            
+            # 2. Результирующая сила
+            # F_net = F_thrust + F_drag
+            f_net = self.force_cmd[i] + f_drag
+            
+            # 3. Второй закон Ньютона: a = F / m
+            acc = f_net / self.mass
+            
+            # 4. Интегрируем скорость: v = v0 + a * dt
+            self.vel[i] += acc * self.dt
+            
+            # 5. Итоговая скорость = Скорость аппарата + Скорость течения
+            v_total = self.vel[i] + self.drift_vel[i]
+            true_vel_vector[i] = v_total
+            
+            # 6. Интегрируем позицию: x = x0 + v_total * dt
+            self.pos[i] += v_total * self.dt
+
+        # Обработка коллизии с "дном" (Z < radius)
+        if self.pos[2] < self.radius:
+            self.pos[2] = self.radius
+            # Неупругое соударение - гасим вертикальную скорость и силу
+            if self.vel[2] < 0: self.vel[2] = 0.0
+            
+        # Генерация синтетических наблюдений (Истина + Гауссов шум)
+        def gauss(mu, sigma):
+            u1 = random.random(); u2 = random.random()
+            if u1 < 1e-12: u1 = 1e-12
+            z = math.sqrt(-2.0*math.log(u1)) * math.cos(2*math.pi*u2)
+            return mu + z * sigma
+
+        meas_noise = [gauss(0.0, self.noise_std) for _ in range(3)]
+        meas_pos = [self.pos[i] + meas_noise[i] for i in range(3)]
+
+        return {
+            "true_x": self.pos[0],
+            "true_y": self.pos[1],
+            "true_z": self.pos[2],
+            "meas_x": meas_pos[0],
+            "meas_y": meas_pos[1],
+            "meas_z": meas_pos[2],
+            "total_vx": true_vel_vector[0],
+            "total_vy": true_vel_vector[1],
+            "total_vz": true_vel_vector[2]
+        }
+
+
+# ==========================================
+#  FastAPI Setup
+# ==========================================
+
 dt = 0.1
+# Увеличим немного шум процесса в фильтре, так как модель движения (CV) 
+# теперь не идеально совпадает с реальностью (Accelerated Motion)
 sim = AUVSimulator(dt)
-kf = LKF(dt, process_noise=0.1, meas_noise=2.0)
+kf = LKF(dt, process_noise=0.5, meas_noise=2.0)
 
 class ControlParams(BaseModel):
     cmd_vx: float
@@ -300,11 +318,20 @@ class ControlParams(BaseModel):
 
 @app.post("/step")
 def step_simulation(params: ControlParams):
+    # 1. Обновляем параметры симулятора (тяга, течение, уровень шума)
     sim.update_params(params.cmd_vx, params.cmd_vy, params.cmd_vz,
                       params.drift_x, params.drift_y, params.drift_z, params.noise)
+    
+    # 2. Шаг "реальной" физики
     sim_data = sim.step()
+    
+    # 3. Шаг Фильтра Калмана
+    # a) Predict: Фильтр думает, куда объект переместится (исходя из пред. скорости)
     kf.predict()
+    
+    # b) Update: Фильтр корректирует предсказание на основе "шумного" измерения
     est = kf.update([sim_data["meas_x"], sim_data["meas_y"], sim_data["meas_z"]])
+    
     return {
         "simulation": sim_data,
         "estimation": {
@@ -314,4 +341,5 @@ def step_simulation(params: ControlParams):
     }
 
 if __name__ == "__main__":
+    print("Starting Physics Engine & Kalman Filter...")
     uvicorn.run(app, host="127.0.0.1", port=8000)
