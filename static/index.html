@@ -6,6 +6,7 @@
     <title>AUV Pro: Replay & Visuals</title>
     <!-- Подключаем библиотеку графиков -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
 
     <style>
         /* общий фон */
@@ -30,6 +31,7 @@
             flex-direction: column;
             z-index: 100;
             box-shadow: 10px 0 40px rgba(0, 0, 0, 0.5);
+            border: none;
         }
 
         /* НОВАЯ ПАНЕЛЬ СПРАВА (ГРАФИКИ) */
@@ -58,10 +60,30 @@
             position: relative;
         }
 
+        .fs-btn {
+            position: absolute;
+            bottom: 5px;
+            right: 5px;
+            padding: 2px 5px;
+            font-size: 0.7em;
+            background: #0066cc;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .fs-btn:hover {
+            background: #0088ee;
+        }
+
         .header {
             padding: 15px 20px;
-            border-bottom: 1px solid #446688;
-            background: linear-gradient(to right, #005599, transparent);
+            background: linear-gradient(to right,
+                    rgba(101, 175, 255, 0.8),
+                    rgba(101, 175, 255, 0.25),
+                    rgba(101, 175, 255, 0));
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -72,17 +94,34 @@
             font-size: 1.1em;
             color: #fff;
             letter-spacing: 1px;
-            text-shadow: 0 0 10px #00aaff;
         }
 
         .step-counter {
-            font-size: 1.2em;
-            color: #ffd700;
-            font-weight: bold;
-            background: rgba(0, 0, 0, 0.3);
-            padding: 5px 10px;
-            border-radius: 4px;
-            border: 1px solid #6688aa;
+            font-size: 0.95em !important;
+            color: #cceeff !important;
+            font-weight: bold !important;
+            background: rgba(60, 120, 180, 0.45) !important;
+            padding: 7px 15px !important;
+            border-radius: 26px !important;
+            border: 1px solid rgba(100, 170, 230, 0.4) !important;
+
+            box-shadow:
+                0 3px 8px rgba(0, 0, 0, 0.25),
+                inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+
+            letter-spacing: 1.2px;
+            transition: all 0.3s ease !important;
+            backdrop-filter: blur(3px);
+            min-width: 85px;
+            text-align: center;
+        }
+
+        .step-counter.updated {
+            background: rgba(80, 140, 200, 0.55) !important;
+            transform: translateY(-1px);
+            box-shadow:
+                0 5px 12px rgba(0, 0, 0, 0.3),
+                inset 0 1px 0 rgba(255, 255, 255, 0.12) !important;
         }
 
         .scroll-area {
@@ -97,8 +136,8 @@
         .panel {
             padding: 12px;
             background: rgba(255, 255, 255, 0.05);
-            border-radius: 8px;
-            border: 1px solid #446688;
+            border-radius: 16px;
+            border: none;
         }
 
         .joystick-panel {
@@ -106,9 +145,8 @@
             flex-direction: column;
             align-items: center;
             background: rgba(255, 255, 255, 0.05);
-            border-radius: 10px;
+            border-radius: 16px;
             padding: 15px 10px;
-            border: 1px solid #446688;
         }
 
         .joystick-title {
@@ -152,6 +190,196 @@
             }
         }
 
+        #joy_thruster,
+        #joy_current {
+            background: rgba(0, 30, 60, 0.5);
+            border: 1px solid rgba(80, 150, 220, 0.3);
+            box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.4);
+            border-radius: 50%;
+        }
+
+        #handle_thruster {
+            fill: #ffd700 !important;
+            stroke: #b39700 !important;
+            stroke-width: 1 !important;
+            filter: drop-shadow(0 3px 8px rgba(0, 0, 0, 0.6));
+        }
+
+        #handle_current {
+            fill: #00ffff !important;
+            stroke: #00aaaa !important;
+            stroke-width: 1 !important;
+            filter: drop-shadow(0 3px 8px rgba(0, 0, 0, 0.6));
+        }
+
+        /* Внутренний блик, чтобы было похоже на ползунок скорости */
+        #handle_thruster::after,
+        #handle_current::after {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.4), transparent 60%);
+            border-radius: 50%;
+            pointer-events: none;
+        }
+
+        /* Оси — приглушённые, чтобы не отвлекали */
+        .joy-axis-x,
+        .joy-axis-y {
+            stroke-width: 2;
+            opacity: 0.6;
+        }
+
+        .joy-axis-x {
+            stroke: rgba(255, 120, 120, 0.5) !important;
+        }
+
+        .joy-axis-y {
+            stroke: rgba(120, 150, 255, 0.5) !important;
+        }
+
+        .joy-val-text {
+            font-family: 'Segoe UI', monospace !important;
+            font-size: 0.85em !important;
+            color: #cceeff !important;
+            background: rgba(10, 40, 70, 0.8) !important;
+            border: 1px solid rgba(80, 150, 220, 0.3) !important;
+            border-radius: 6px;
+            padding: 4px 8px;
+            margin-top: 6px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        #sim_speed {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 10px;
+            border-radius: 8px;
+            background: rgba(0, 40, 70, 0.6);
+            /* тёмная дорожка */
+            outline: none;
+            margin: 12px 0;
+            cursor: pointer;
+            border: 1px solid rgba(0, 120, 200, 0.3);
+            box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.4);
+        }
+
+        #sim_speed::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #88ccff, #44aadd);
+            border: 2px solid #003355;
+            box-shadow:
+                0 3px 10px rgba(0, 0, 0, 0.5),
+                0 0 10px rgba(100, 200, 255, 0.4);
+            cursor: grab;
+            transition: all 0.2s ease;
+        }
+
+        #sim_speed::-moz-range-track {
+            height: 10px;
+            border-radius: 8px;
+            background: rgba(0, 40, 70, 0.6);
+            border: 1px solid rgba(0, 120, 200, 0.3);
+            box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.4);
+        }
+
+        #sim_speed::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #88ccff, #44aadd);
+            border: 2px solid #003355;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.5);
+            cursor: grab;
+        }
+
+        #noise.pretty-slider,
+        .pretty-slider {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 10px;
+            border-radius: 8px;
+            background: rgba(0, 40, 70, 0.6);
+            outline: none;
+            margin: 12px 0;
+            cursor: pointer;
+            border: 1px solid rgba(0, 120, 200, 0.3);
+            box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.4);
+        }
+
+        #noise::-webkit-slider-thumb,
+        .pretty-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #88ccff, #44aadd);
+            border: 2px solid #003355;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.5), 0 0 10px rgba(100, 200, 255, 0.4);
+            cursor: grab;
+            transition: all 0.2s ease;
+        }
+
+        #noise::-webkit-slider-thumb:hover,
+        .pretty-slider::-webkit-slider-thumb:hover {
+            background: linear-gradient(135deg, #aaddff, #66bbff);
+            transform: scale(1.15);
+        }
+
+        #noise::-webkit-slider-thumb:active,
+        .pretty-slider::-webkit-slider-thumb:active {
+            cursor: grabbing;
+            transform: scale(1.05);
+        }
+
+        /* Firefox */
+        #noise::-moz-range-thumb,
+        .pretty-slider::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #88ccff, #44aadd);
+            border: 2px solid #003355;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.5);
+            cursor: grab;
+            border: none;
+        }
+
+        #btn_play {
+            background: #335c81 !important;
+            color: #cceeff !important;
+            font-size: 0.95em !important;
+            font-weight: bold !important;
+            padding: 8px 20px !important;
+            border-radius: 20px !important;
+            border: 1px solid rgba(100, 170, 230, 0.4) !important;
+            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2) !important;
+            transition: all 0.25s ease !important;
+            letter-spacing: 1px;
+            min-width: 100px;
+            backdrop-filter: blur(4px);
+        }
+
+        #btn_play:hover {
+            background: rgba(0, 190, 255, 0.35) !important;
+            color: #aaddff !important;
+            border-color: rgba(0, 200, 255, 0.6) !important;
+            transform: translateY(-1px);
+        }
+
+        #btn_play.stop {
+            background: rgba(214, 40, 40, 0.35) !important;
+            color: #ff8888 !important;
+            border-color: rgba(255, 70, 70, 0.5) !important;
+        }
+
         input[type=range] {
             width: 100%;
             accent-color: #00aaff;
@@ -191,10 +419,6 @@
             cursor: grab;
         }
 
-        .joy-handle:active {
-            cursor: grabbing;
-        }
-
         .joy-text {
             font-size: 10px;
             font-family: monospace;
@@ -223,6 +447,58 @@
             width: 50px;
         }
 
+        .vert-slider {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 120px;
+            height: 8px;
+            background: rgba(0, 40, 70, 0.7);
+            outline: none;
+            border-radius: 6px;
+            border: 1px solid rgba(0, 120, 200, 0.4);
+            box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.5);
+        }
+
+        .vert-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #88ccff, #44aadd);
+            border: 2px solid #003355;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.5), 0 0 10px rgba(100, 200, 255, 0.4);
+            cursor: grab;
+            transition: all 0.2s ease;
+        }
+
+        .vert-slider::-webkit-slider-thumb:hover {
+            background: linear-gradient(135deg, #aaddff, #66bbff);
+            transform: scale(1.15);
+        }
+
+        .vert-slider::-webkit-slider-thumb:active {
+            cursor: grabbing;
+            transform: scale(1.05);
+        }
+
+        .vert-slider::-moz-range-track {
+            height: 8px;
+            background: rgba(0, 40, 70, 0.7);
+            border-radius: 6px;
+            border: 1px solid rgba(0, 120, 200, 0.4);
+            box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.5);
+        }
+
+        .vert-slider::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #88ccff, #44aadd);
+            border: 2px solid #003355;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.5);
+            cursor: grab;
+        }
+
         .vert-slider-container {
             width: 30px;
             height: 120px;
@@ -230,35 +506,83 @@
             border-radius: 15px;
             position: relative;
             border: 1px solid #446688;
-        }
-
-        input[type=range].vert-slider {
-            -webkit-appearance: none;
-            width: 110px;
-            height: 30px;
-            position: absolute;
-            top: 45px;
-            left: -40px;
-            transform: rotate(-90deg);
-            background: transparent;
-            cursor: pointer;
+            display: flex;
+            justify-content: center;
         }
 
         .vert-slider-container::before {
             content: '';
             position: absolute;
-            left: 14px;
+            left: 50%;
+            transform: translateX(-50%);
             top: 10px;
             bottom: 10px;
             width: 2px;
             background: #446688;
         }
 
+        input[type=range].vert-slider {
+            -webkit-appearance: none;
+            width: 120px;
+            height: 30px;
+            position: absolute;
+            top: 45px;
+            left: -45px;
+            transform: rotate(-90deg);
+            background: transparent;
+            cursor: pointer;
+            margin: 0;
+        }
+
+        #noise::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #88ccff, #44aadd);
+            border: 2px solid #003355;
+            box-shadow:
+                0 3px 10px rgba(0, 0, 0, 0.5),
+                0 0 10px rgba(100, 200, 255, 0.4);
+            cursor: grab;
+            transition: all 0.2s ease;
+        }
+
+        #noise::-webkit-slider-thumb:hover {
+            background: linear-gradient(135deg, #aaddff, #66bbff);
+            transform: scale(1.15);
+        }
+
+        #noise::-webkit-slider-thumb:active {
+            cursor: grabbing;
+            transform: scale(1.05);
+        }
+
+        #noise::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #88ccff, #44aadd);
+            border: 2px solid #003355;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.5);
+            cursor: grab;
+            border: none;
+        }
+
+        #noise::-moz-range-track {
+            height: 10px;
+            border-radius: 8px;
+            background: rgba(0, 40, 70, 0.6);
+            border: 1px solid rgba(0, 120, 200, 0.3);
+            box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.4);
+        }
+
         #gizmo-container {
             width: 100%;
             height: 200px;
-            background: rgba(0, 20, 40, 0.6);
-            border-radius: 8px;
+            background: radial-gradient(circle at center, rgba(10, 35, 60, 1), rgba(0, 15, 30, 1));
+            border-radius: 16px;
             position: relative;
             overflow: hidden;
             cursor: move;
@@ -353,6 +677,24 @@
             background: #333;
             font-family: monospace;
         }
+
+        #show_charts_btn {
+            position: absolute;
+            top: 260px;
+            /* Располагаем под легендой */
+            right: 440px;
+            /* Такое же смещение как у легенды */
+            z-index: 100;
+            display: none;
+            width: auto;
+        }
+
+        #show_charts_btn button {
+            width: auto;
+            padding: 8px 15px;
+            font-size: 0.9em;
+            white-space: nowrap;
+        }
     </style>
 
     <script type="importmap">
@@ -369,13 +711,13 @@
 
     <div class="controls-ui">
         <div class="header">
-            <h2>ГОЙДА ЛАБА</h2>
+            <h2>ЛАБА</h2>
             <div id="step_display" class="step-counter">ШАГ: 0</div>
         </div>
 
         <div class="scroll-area">
             <!-- кнопка сверху -->
-            <div class="panel" style="border-left: 4px solid #00aaff;">
+            <div class="panel" style="border-left: 3px solid #65afff;">
                 <button id="btn_play" onclick="togglePlay()">СТАРТ</button>
 
                 <div style="margin-top:8px; display:flex; justify-content:space-between; font-size:0.8em; color:#ccc;">
@@ -387,7 +729,7 @@
             </div>
 
             <!-- джойстик для бархатной тяги -->
-            <div class="joystick-panel" style="border-left: 4px solid #ffd700;">
+            <div class="joystick-panel" style="border-left: 3px solid #ffd700;">
                 <div class="joystick-title">Тяга</div>
                 <div class="control-row">
                     <div style="display:flex; flex-direction:column; align-items:center;">
@@ -408,13 +750,13 @@
                         <div class="vert-slider-container">
                             <input type="range" id="cmd_vz" class="vert-slider" min="-2" max="2" step="0.1" value="0">
                         </div>
-                        <div style="font-size:0.7em; color:#0f0; margin-top:5px; font-weight:bold;">Z</div>
+                        <div style="font-size:0.7em; color:#88ccff; margin-top:5px; font-weight:bold;">Z</div>
                     </div>
                 </div>
             </div>
 
             <!-- джойстик для течения -->
-            <div class="joystick-panel" style="border-left: 4px solid #00ffff;">
+            <div class="joystick-panel" style="border-left: 3px solid #00ffff;">
                 <div class="joystick-title">Течение</div>
                 <div class="control-row">
                     <div style="display:flex; flex-direction:column; align-items:center;">
@@ -430,7 +772,7 @@
                         <div class="vert-slider-container">
                             <input type="range" id="drift_z" class="vert-slider" min="-1" max="1" step="0.1" value="0">
                         </div>
-                        <div style="font-size:0.7em; color:#0f0; margin-top:5px;">Z</div>
+                        <div style="font-size:0.7em; color:#88ccff; margin-top:5px; font-weight:bold;">Z</div>
                     </div>
                 </div>
             </div>
@@ -438,7 +780,7 @@
             <!-- шум -->
             <div class="joystick-panel">
                 <div class="joystick-title">Шум</div>
-                <input type="range" id="noise" min="0" max="10" step="0.1" value="0.5">
+                <input type="range" id="noise" class="pretty-slider" min="0" max="10" step="0.1" value="0.5">
                 <div
                     style="display:flex; justify-content:space-between; width:100%; font-size:0.8em; color:#aaa; margin-top:5px;">
                     <span>0.0</span>
@@ -452,14 +794,15 @@
                 <div class="joystick-title">Вектор Тяги</div>
                 <div id="gizmo-container">
                     <div class="gizmo-legend">
-                        <div style="color:#ffd700">🟡 Тяга</div>
-                        <div style="color:#00ffff">🔵 Течение</div>
-                        <div style="color:#00ff00">🟢 Итог</div>
+                        <div style="color:#ffd700; font-weight:bold">🟡 Тяга</div>
+                        <div style="color:#00ffff; font-weight:bold">🔵 Течение</div>
+                        <div style="color:#00ff00; font-weight:bold">🟢 Итог</div>
                     </div>
                 </div>
             </div>
 
-            <div style="font-size:0.8em; color:#888; border-top:1px solid #335577; padding-top:10px; margin-top:5px;">
+            <div
+                style="font-size:1.1em; font-weight:bold; color:#888; border-top:1px solid #335577; padding-top:10px; margin-top:5px;">
                 <div>Глубина: <span id="depth_val" style="color:#0f0; font-size:1.1em">0.00</span> м</div>
                 <div>Скорость: <span id="true_v" style="color:#fff">0.00</span> м/с</div>
             </div>
@@ -468,53 +811,73 @@
 
     <!-- ПАНЕЛЬ ГРАФИКОВ -->
     <div class="charts-ui">
-        <div style="color:#fff; border-bottom:1px solid #446688; padding-bottom:5px; margin-bottom:10px;">
+        <div
+            style="color:#fff; border-bottom:1px solid #446688; padding-bottom:5px; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;">
             МОНИТОРИНГ ФИЛЬТРА
+            <button id="close_charts" style="width:auto; padding:5px 10px; font-size:0.8em;">Закрыть</button>
         </div>
 
         <div style="color:#aaa; font-size:0.8em;">Координата X (Сравнение)</div>
         <div class="chart-wrapper">
             <canvas id="chartPosX"></canvas>
+            <button class="fs-btn" onclick="this.parentElement.requestFullscreen()">Полный экран</button>
         </div>
+        <div id="currentPosX"
+            style="color:#ccc; font-size:0.8em; text-align:center; margin-top: -10px; margin-bottom: 10px;">True: 0.00 |
+            Est: 0.00 | Meas: 0.00</div>
 
         <div style="color:#aaa; font-size:0.8em;">Координата Y (Сравнение)</div>
         <div class="chart-wrapper">
             <canvas id="chartPosY"></canvas>
+            <button class="fs-btn" onclick="this.parentElement.requestFullscreen()">Полный экран</button>
         </div>
+        <div id="currentPosY"
+            style="color:#ccc; font-size:0.8em; text-align:center; margin-top: -10px; margin-bottom: 10px;">True: 0.00 |
+            Est: 0.00 | Meas: 0.00</div>
 
         <div style="color:#aaa; font-size:0.8em;">Координата Z (Сравнение)</div>
         <div class="chart-wrapper">
             <canvas id="chartPosZ"></canvas>
+            <button class="fs-btn" onclick="this.parentElement.requestFullscreen()">Полный экран</button>
         </div>
+        <div id="currentPosZ"
+            style="color:#ccc; font-size:0.8em; text-align:center; margin-top: -10px; margin-bottom: 10px;">True: 0.00 |
+            Est: 0.00 | Meas: 0.00</div>
 
         <div style="color:#aaa; font-size:0.8em;">Скорость Vx (Динамика)</div>
         <div class="chart-wrapper">
             <canvas id="chartVelX"></canvas>
+            <button class="fs-btn" onclick="this.parentElement.requestFullscreen()">Полный экран</button>
         </div>
 
         <div style="color:#aaa; font-size:0.8em;">Скорость Vy (Динамика)</div>
         <div class="chart-wrapper">
             <canvas id="chartVelY"></canvas>
+            <button class="fs-btn" onclick="this.parentElement.requestFullscreen()">Полный экран</button>
         </div>
 
         <div style="color:#aaa; font-size:0.8em;">Скорость Vz (Динамика)</div>
         <div class="chart-wrapper">
             <canvas id="chartVelZ"></canvas>
+            <button class="fs-btn" onclick="this.parentElement.requestFullscreen()">Полный экран</button>
         </div>
 
         <div style="color:#aaa; font-size:0.8em;">Ошибка Оценки X (Error)</div>
         <div class="chart-wrapper">
             <canvas id="chartErrX"></canvas>
+            <button class="fs-btn" onclick="this.parentElement.requestFullscreen()">Полный экран</button>
         </div>
 
         <div style="color:#aaa; font-size:0.8em;">Ошибка Оценки Y (Error)</div>
         <div class="chart-wrapper">
             <canvas id="chartErrY"></canvas>
+            <button class="fs-btn" onclick="this.parentElement.requestFullscreen()">Полный экран</button>
         </div>
 
         <div style="color:#aaa; font-size:0.8em;">Ошибка Оценки Z (Error)</div>
         <div class="chart-wrapper">
             <canvas id="chartErrZ"></canvas>
+            <button class="fs-btn" onclick="this.parentElement.requestFullscreen()">Полный экран</button>
         </div>
     </div>
 
@@ -550,14 +913,18 @@
         </div>
     </div>
 
+    <!-- КНОПКА ПОД ЛЕГЕНДОЙ -->
+    <div id="show_charts_btn">
+        <button
+            onclick="document.querySelector('.charts-ui').style.display = 'flex'; document.getElementById('show_charts_btn').style.display = 'none';">Показать
+            графики</button>
+    </div>
+
     <script type="module">
         import * as THREE from 'three';
         import { MapControls } from 'three/addons/controls/MapControls.js';
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
-        // =========================================================
-        // 1. ИНИЦИАЛИЗАЦИЯ STATE (ВАЖНО! ДО ГРАФИКОВ)
-        // =========================================================
         const params = { cmd_vx: 0.0, cmd_vy: 0.0, cmd_vz: 0.0, drift_x: 0.0, drift_y: 0.0, drift_z: 0.0, noise: 0.5 };
         const state = { history: [], currentIdx: -1, isPlaying: false, timer: null };
 
@@ -615,7 +982,20 @@
                 options: {
                     responsive: true, maintainAspectRatio: false, animation: false,
                     elements: { point: { radius: 0 } },
-                    scales: { x: { display: false }, y: { grid: { color: 'rgba(255,255,255,0.1)' } } }
+                    scales: { x: { display: false }, y: { grid: { color: 'rgba(255,255,255,0.1)' } } },
+                    plugins: {
+                        zoom: {
+                            zoom: {
+                                wheel: { enabled: false },
+                                pinch: { enabled: false },
+                                mode: 'xy'
+                            },
+                            pan: {
+                                enabled: true,
+                                mode: 'xy'
+                            }
+                        }
+                    }
                 }
             });
         }
@@ -623,7 +1003,7 @@
         const cPosX = makeChart('chartPosX', [
             { label: 'True X', data: chartData.truePosX, borderColor: 'cyan', borderWidth: 2 },
             { label: 'Est X', data: chartData.estPosX, borderColor: 'lime', borderWidth: 2 },
-            { label: 'Meas X', data: chartData.measPosX, borderColor: 'red', borderWidth: 0, pointRadius: 2, type: 'scatter' }
+            { label: 'Meas X', data: chartData.measPosX, borderColor: 'red', borderWidth: 0, pointRadius: 3, pointBackgroundColor: 'red', pointBorderColor: '#fff', pointBorderWidth: 1, type: 'scatter' }
         ]);
 
         const cVelX = makeChart('chartVelX', [
@@ -638,7 +1018,7 @@
         const cPosY = makeChart('chartPosY', [
             { label: 'True Y', data: chartData.truePosY, borderColor: 'cyan', borderWidth: 2 },
             { label: 'Est Y', data: chartData.estPosY, borderColor: 'lime', borderWidth: 2 },
-            { label: 'Meas Y', data: chartData.measPosY, borderColor: 'red', borderWidth: 0, pointRadius: 2, type: 'scatter' }
+            { label: 'Meas Y', data: chartData.measPosY, borderColor: 'red', borderWidth: 0, pointRadius: 3, pointBackgroundColor: 'red', pointBorderColor: '#fff', pointBorderWidth: 1, type: 'scatter' }
         ]);
 
         const cVelY = makeChart('chartVelY', [
@@ -653,7 +1033,7 @@
         const cPosZ = makeChart('chartPosZ', [
             { label: 'True Z', data: chartData.truePosZ, borderColor: 'cyan', borderWidth: 2 },
             { label: 'Est Z', data: chartData.estPosZ, borderColor: 'lime', borderWidth: 2 },
-            { label: 'Meas Z', data: chartData.measPosZ, borderColor: 'red', borderWidth: 0, pointRadius: 2, type: 'scatter' }
+            { label: 'Meas Z', data: chartData.measPosZ, borderColor: 'red', borderWidth: 0, pointRadius: 3, pointBackgroundColor: 'red', pointBorderColor: '#fff', pointBorderWidth: 1, type: 'scatter' }
         ]);
 
         const cVelZ = makeChart('chartVelZ', [
@@ -670,6 +1050,33 @@
             cPosY.draw(); cVelY.draw(); cErrY.draw();
             cPosZ.draw(); cVelZ.draw(); cErrZ.draw();
         }
+
+        // Обработчик для ресайза чартов в полноэкранном режиме
+        document.addEventListener('fullscreenchange', () => {
+            if (document.fullscreenElement) {
+                const canvas = document.fullscreenElement.querySelector('canvas');
+                if (canvas) {
+                    const chart = Chart.getChart(canvas.id);
+                    if (chart) {
+                        chart.options.plugins.zoom.zoom.wheel.enabled = true;
+                        chart.options.plugins.zoom.zoom.pinch.enabled = true;
+                        chart.options.plugins.zoom.zoom.drag.enabled = true;
+                        chart.resize();
+                        chart.update();
+                    }
+                }
+            } else {
+                // При выходе из полноэкранного - ресайз всех чартов на всякий случай
+                const charts = [cPosX, cVelX, cErrX, cPosY, cVelY, cErrY, cPosZ, cVelZ, cErrZ];
+                charts.forEach(chart => {
+                    chart.options.plugins.zoom.zoom.wheel.enabled = false;
+                    chart.options.plugins.zoom.zoom.pinch.enabled = false;
+                    chart.options.plugins.zoom.zoom.drag.enabled = false;
+                    chart.resize();
+                    chart.update();
+                });
+            }
+        });
 
         // =========================================================
         // 3. ОСНОВНОЙ КОД
@@ -709,6 +1116,23 @@
             params.noise = parseFloat(e.target.value);
             document.getElementById('val_noise').innerText = params.noise.toFixed(1);
         });
+
+        // Закрытие/открытие панели графиков
+        document.getElementById('close_charts').onclick = () => {
+            document.querySelector('.charts-ui').style.display = 'none';
+            document.getElementById('show_charts_btn').style.display = 'block';
+            document.querySelector('.timeline-bar').style.right = '20px';
+            document.querySelector('.legend').style.right = '20px';
+            // Обновляем позицию кнопки при закрытии графиков
+            document.getElementById('show_charts_btn').style.right = '20px';
+        };
+
+        document.querySelector('#show_charts_btn button').onclick = () => {
+            document.querySelector('.charts-ui').style.display = 'flex';
+            document.getElementById('show_charts_btn').style.display = 'none';
+            document.querySelector('.timeline-bar').style.right = '440px';
+            document.querySelector('.legend').style.right = '440px';
+        };
 
         const scene = new THREE.Scene();
         const waterColor = 0x003b5e;
@@ -785,43 +1209,157 @@
         mMesh.count = 0; mMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage); scene.add(mMesh);
         const dummy = new THREE.Object3D();
 
+        // ==================================================================================
+        // ВИЗУАЛИЗАЦИЯ GIZMO (УЛУЧШЕННАЯ)
+        // ==================================================================================
         const gizmoContainer = document.getElementById('gizmo-container');
         const sceneMini = new THREE.Scene();
+
         const cameraMini = new THREE.PerspectiveCamera(50, gizmoContainer.clientWidth / gizmoContainer.clientHeight, 0.1, 50);
-        cameraMini.position.set(3, 2, 4); cameraMini.lookAt(0, 0, 0);
+        cameraMini.position.set(3, 2.5, 4);
+        cameraMini.lookAt(0, 0, 0);
+
         const rendererMini = new THREE.WebGLRenderer({ alpha: true, antialias: true });
         rendererMini.setSize(gizmoContainer.clientWidth, gizmoContainer.clientHeight);
+        rendererMini.setPixelRatio(window.devicePixelRatio); // Четкость!
         gizmoContainer.appendChild(rendererMini.domElement);
-        const controlsMini = new OrbitControls(cameraMini, rendererMini.domElement);
-        controlsMini.enableZoom = false; controlsMini.enablePan = false;
 
-        function gAxis(c, s, e) {
-            const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints([s, e]), new THREE.LineBasicMaterial({ color: c }));
-            sceneMini.add(l);
+        const controlsMini = new OrbitControls(cameraMini, rendererMini.domElement);
+        controlsMini.enableZoom = false;
+        controlsMini.enablePan = false;
+
+        // Свет в мини-сцене для объема
+        const ambientMini = new THREE.AmbientLight(0xffffff, 0.6);
+        sceneMini.add(ambientMini);
+        const lightMini = new THREE.PointLight(0xffffff, 1, 20);
+        lightMini.position.set(5, 5, 5);
+        sceneMini.add(lightMini);
+
+        // Красивая сетка вместо осей (более тусклая, чтобы текст читался)
+        const polarGrid = new THREE.PolarGridHelper(3, 8, 8, 64, 0x223344, 0x112233);
+        sceneMini.add(polarGrid);
+
+        // Функция для рисования оси
+        function drawMiniAxis(start, end, colorHex) {
+            const pts = [start, end];
+            const geo = new THREE.BufferGeometry().setFromPoints(pts);
+            const mat = new THREE.LineBasicMaterial({ color: colorHex, linewidth: 2 });
+            const line = new THREE.Line(geo, mat);
+            sceneMini.add(line);
         }
 
-        gAxis(0xff0000, new THREE.Vector3(-2, 0, 0), new THREE.Vector3(2, 0, 0));
-        gAxis(0x00ff00, new THREE.Vector3(0, -2, 0), new THREE.Vector3(0, 2, 0));
-        gAxis(0x0000ff, new THREE.Vector3(0, 0, -2), new THREE.Vector3(0, 0, 2));
+        const cX = 0xffaaaa; // Красный (Продольная)
+        const cY = 0xaaaaff; // Синий (Поперечная)
+        const cZ = 0xaaffaa; // Зеленый (Глубина)
 
+        drawMiniAxis(new THREE.Vector3(-3, 0, 0), new THREE.Vector3(3, 0, 0), cX);
+
+        // Ось Z симулятора (в ThreeJS это Y - вертикаль)
+        drawMiniAxis(new THREE.Vector3(0, -3, 0), new THREE.Vector3(0, 3, 0), cZ);
+
+        // Ось Y симулятора (в ThreeJS это Z - глубина экрана)
+        drawMiniAxis(new THREE.Vector3(0, 0, -3), new THREE.Vector3(0, 0, 3), cY);
+
+        // Текстовые метки с цветами из джойстика
         function addMiniLabel(txt, x, y, z, col) {
             const c = document.createElement('canvas'); const ctx = c.getContext('2d');
             ctx.font = "Bold 60px monospace"; const w = ctx.measureText(txt).width; c.width = w + 20; c.height = 70;
             ctx.font = "Bold 60px monospace"; ctx.fillStyle = col; ctx.fillText(txt, 10, 60);
             const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c) }));
-            s.position.set(x, y, z); s.scale.set(1, 0.5, 1); sceneMini.add(s);
+            s.position.set(x, y, z); s.scale.set(0.8, 0.4, 1);
+            sceneMini.add(s);
         }
-        addMiniLabel("X+", 2.2, 0, 0, "#ff4444"); addMiniLabel("X-", -2.2, 0, 0, "#ff4444");
-        addMiniLabel("Z+", 0, 2.2, 0, "#00ff00"); addMiniLabel("Z-", 0, -2.2, 0, "#00ff00");
-        addMiniLabel("Y+", 0, 0, 2.2, "#4444ff"); addMiniLabel("Y-", 0, 0, -2.2, "#4444ff");
 
-        const miniBoat = new THREE.Mesh(new THREE.CapsuleGeometry(0.2, 0.8, 4, 8), new THREE.MeshBasicMaterial({ color: 0xffaa00, wireframe: true }));
-        miniBoat.rotation.z = Math.PI / 2; sceneMini.add(miniBoat);
+        // Цвета берем из SVG:
+        // X (Vertical Joy Axis): #ffaaaa (Light Red)
+        // Y (Horizontal Joy Axis): #aaaaff (Light Blue)
+        // Z (Depth): #aaffaa (Light Green - для комплекта RGB)
 
-        function createArrow(col) { return new THREE.ArrowHelper(new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 0, 0), 0, col, 0.2, 0.1); }
-        const arrowCmd = createArrow(0xffff00); sceneMini.add(arrowCmd);
-        const arrowDrift = createArrow(0x00ffff); sceneMini.add(arrowDrift);
-        const arrowTotal = createArrow(0x00ff00); sceneMini.add(arrowTotal);
+        const colX = "#ffaaaa";
+        const colY = "#aaaaff";
+        const colZ = "#aaffaa";
+
+        addMiniLabel("X+", 2.8, 0, 0, colX);
+        addMiniLabel("X-", -2.8, 0, 0, colX);
+
+        addMiniLabel("Y+", 0, 0, 2.8, colY);
+        addMiniLabel("Y-", 0, 0, -2.8, colY);
+
+        addMiniLabel("Z+", 0, 2.2, 0, colZ);
+
+        // Лодка: полупрозрачная капсула (Стекло)
+        const hullMat = new THREE.MeshPhysicalMaterial({
+            color: 0x00aaff, transparent: true, opacity: 0.15,
+            roughness: 0.1, metalness: 0.5, side: THREE.DoubleSide
+        });
+        const miniBoat = new THREE.Mesh(new THREE.CapsuleGeometry(0.2, 0.8, 4, 8), hullMat);
+        miniBoat.rotation.z = Math.PI / 2;
+        // Добавляем внутреннее ребро жесткости для красоты
+        const innerWire = new THREE.Mesh(new THREE.CapsuleGeometry(0.18, 0.78, 4, 4), new THREE.MeshBasicMaterial({ wireframe: true, color: 0x005588, transparent: true, opacity: 0.3 }));
+        innerWire.rotation.z = Math.PI / 2;
+        miniBoat.add(innerWire);
+        sceneMini.add(miniBoat);
+
+        // Функция создания красивой 3D стрелки
+        function createFatArrow(colorHex) {
+            const group = new THREE.Group();
+
+            // Материал со свечением
+            const mat = new THREE.MeshStandardMaterial({
+                color: colorHex,
+                emissive: colorHex,
+                emissiveIntensity: 0.6,
+                roughness: 0.3,
+                metalness: 0.7
+            });
+
+            // Стержень
+            const shaftGeo = new THREE.CylinderGeometry(0.04, 0.04, 1, 12);
+            shaftGeo.translate(0, 0.5, 0); // Сдвиг, чтобы начало было в 0
+            const shaft = new THREE.Mesh(shaftGeo, mat);
+            shaft.scale.y = 1; // Будем менять длину через scale
+
+            // Наконечник
+            const headGeo = new THREE.ConeGeometry(0.12, 0.3, 16);
+            headGeo.translate(0, 0.15, 0); // Сдвиг центра
+            const head = new THREE.Mesh(headGeo, mat);
+
+            group.add(shaft);
+            group.add(head);
+
+            // Сохраняем ссылки для обновления
+            group.userData = { shaft, head };
+            sceneMini.add(group);
+            return group;
+        }
+
+        // Обновление стрелки (направление и длина)
+        function updateFatArrow(arrowGroup, dirVec, length) {
+            if (length < 0.05) {
+                arrowGroup.visible = false;
+                return;
+            }
+            arrowGroup.visible = true;
+            const len = Math.min(length, 3.0); // Ограничим визуальную длину
+
+            // Поворот: по дефолту объекты смотрят вверх (Y), нам нужно направить их по dirVec
+            // Используем quaternion
+            const axis = new THREE.Vector3(0, 1, 0); // Исходное направление стрелки
+            const quaternion = new THREE.Quaternion().setFromUnitVectors(axis, dirVec.clone().normalize());
+            arrowGroup.setRotationFromQuaternion(quaternion);
+
+            // Масштабирование стержня
+            // Длина наконечника 0.3, остальное стержень
+            const headLen = 0.3;
+            const shaftLen = Math.max(0.01, len - headLen);
+
+            arrowGroup.userData.shaft.scale.y = shaftLen;
+            arrowGroup.userData.head.position.y = shaftLen;
+        }
+
+        const arrowCmd = createFatArrow(0xffd700); // Желтая
+        const arrowDrift = createFatArrow(0x00ffff); // Циан
+        const arrowTotal = createFatArrow(0x00ff00); // Зеленая
 
         const ws = new WebSocket("ws://" + location.host + "/ws");
         ws.onmessage = e => {
@@ -952,6 +1490,11 @@
             document.getElementById('true_v').innerText = Math.hypot(d.simulation.total_vx, d.simulation.total_vy, d.simulation.total_vz).toFixed(2);
             updateTimelineUI();
 
+            // ОБНОВЛЕНИЕ ТЕКУЩИХ ЗНАЧЕНИЙ
+            document.getElementById('currentPosX').innerText = `True: ${d.simulation.true_x.toFixed(2)} | Est: ${d.estimation.est_x.toFixed(2)} | Meas: ${d.simulation.meas_x.toFixed(2)}`;
+            document.getElementById('currentPosY').innerText = `True: ${d.simulation.true_y.toFixed(2)} | Est: ${d.estimation.est_y.toFixed(2)} | Meas: ${d.simulation.meas_y.toFixed(2)}`;
+            document.getElementById('currentPosZ').innerText = `True: ${d.simulation.true_z.toFixed(2)} | Est: ${d.estimation.est_z.toFixed(2)} | Meas: ${d.simulation.meas_z.toFixed(2)}`;
+
             // ОБНОВЛЕНИЕ КУРСОРА НА ГРАФИКЕ
             updateChartsCursor();
         }
@@ -975,20 +1518,17 @@
         });
 
         function updateGizmoVectors() {
+            // Команда
             const vCmd = new THREE.Vector3(params.cmd_vx, params.cmd_vz, params.cmd_vy);
-            const lenCmd = vCmd.length();
-            arrowCmd.visible = (lenCmd > 0.1);
-            if (arrowCmd.visible) { arrowCmd.setDirection(vCmd.normalize()); arrowCmd.setLength(Math.min(lenCmd, 2.5)); }
+            updateFatArrow(arrowCmd, vCmd, vCmd.length());
 
+            // Дрифт (течение)
             const vDrift = new THREE.Vector3(params.drift_x, params.drift_z, params.drift_y);
-            const lenDrift = vDrift.length();
-            arrowDrift.visible = (lenDrift > 0.1);
-            if (arrowDrift.visible) { arrowDrift.setDirection(vDrift.normalize()); arrowDrift.setLength(Math.min(lenDrift, 2.5)); }
+            updateFatArrow(arrowDrift, vDrift, vDrift.length());
 
+            // Итог
             const vTotal = new THREE.Vector3(params.cmd_vx + params.drift_x, params.cmd_vz + params.drift_z, params.cmd_vy + params.drift_y);
-            const lenTotal = vTotal.length();
-            arrowTotal.visible = (lenTotal > 0.1);
-            if (arrowTotal.visible) { arrowTotal.setDirection(vTotal.normalize()); arrowTotal.setLength(Math.min(lenTotal, 3.0)); }
+            updateFatArrow(arrowTotal, vTotal, vTotal.length());
         }
 
         function animate() {
