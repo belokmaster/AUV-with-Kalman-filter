@@ -58,24 +58,47 @@
             padding: 5px;
             height: 200px;
             position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #fullscreen-tooltip {
+            font-family: 'Segoe UI', monospace;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+        }
+
+        .chart-wrapper canvas {
+            flex-grow: 1;
+            height: calc(100% - 30px);
+            /* Оставляем место для кнопки */
         }
 
         .fs-btn {
             position: absolute;
-            bottom: 5px;
-            right: 5px;
-            padding: 2px 5px;
-            font-size: 0.7em;
-            background: #0066cc;
-            color: white;
-            border: none;
-            border-radius: 4px;
+            bottom: 8px;
+            /* Чуть ниже от графика */
+            right: 8px;
+            padding: 6px 12px !important;
+            font-size: 0.75em !important;
+            background: #335c81 !important;
+            color: #cceeff !important;
+            font-weight: bold !important;
+            border-radius: 20px !important;
+            border: 1px solid rgba(100, 170, 230, 0.4) !important;
+            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2) !important;
+            transition: all 0.25s ease !important;
+            letter-spacing: 1px;
+            backdrop-filter: blur(4px);
             cursor: pointer;
-            transition: 0.2s;
+            width: auto !important;
         }
 
         .fs-btn:hover {
-            background: #0088ee;
+            background: rgba(0, 190, 255, 0.35) !important;
+            color: #aaddff !important;
+            border-color: rgba(0, 200, 255, 0.6) !important;
+            transform: translateY(-1px);
         }
 
         .header {
@@ -876,7 +899,7 @@
             <div
                 style="font-size:1.1em; font-weight:bold; color:#888; border-top:1px solid #335577; padding-top:10px; margin-top:5px;">
                 <div>Глубина: <span id="depth_val" style="color:#0f0; font-size:1.1em">0.00</span> м</div>
-                <div>Скорость: <span id="true_v" style="color:#fff">0.00</span> м/с</div>
+                <div>Скорость: <span id="true_v" style="color:#fff; font-size:1.1em">0.00</span> м/с</div>
             </div>
         </div>
     </div>
@@ -889,16 +912,17 @@
             <button id="close_charts" style="width:auto; padding:5px 10px; font-size:0.8em;">Закрыть</button>
         </div>
 
-        <div style="color:#aaa; font-size:0.8em;">Координата X (Сравнение)</div>
+        <div style="color:#aaa; font-size:0.9em; font-weight:bold; margin-bottom: 10px;">Координата X:</div>
         <div class="chart-wrapper">
             <canvas id="chartPosX"></canvas>
             <button class="fs-btn" onclick="this.parentElement.requestFullscreen()">Полный экран</button>
         </div>
+
         <div id="currentPosX"
             style="color:#ccc; font-size:0.8em; text-align:center; margin-top: -10px; margin-bottom: 10px;">True: 0.00 |
             Est: 0.00 | Meas: 0.00</div>
 
-        <div style="color:#aaa; font-size:0.8em;">Координата Y (Сравнение)</div>
+        <div style="color:#aaa; font-size:0.9em; font-weight:bold; margin-bottom: 10px;">Координата Y:</div>
         <div class="chart-wrapper">
             <canvas id="chartPosY"></canvas>
             <button class="fs-btn" onclick="this.parentElement.requestFullscreen()">Полный экран</button>
@@ -907,7 +931,7 @@
             style="color:#ccc; font-size:0.8em; text-align:center; margin-top: -10px; margin-bottom: 10px;">True: 0.00 |
             Est: 0.00 | Meas: 0.00</div>
 
-        <div style="color:#aaa; font-size:0.8em;">Координата Z (Сравнение)</div>
+        <div style="color:#aaa; font-size:0.9em; font-weight:bold; margin-bottom: 10px;">Координата Z:</div>
         <div class="chart-wrapper">
             <canvas id="chartPosZ"></canvas>
             <button class="fs-btn" onclick="this.parentElement.requestFullscreen()">Полный экран</button>
@@ -916,37 +940,37 @@
             style="color:#ccc; font-size:0.8em; text-align:center; margin-top: -10px; margin-bottom: 10px;">True: 0.00 |
             Est: 0.00 | Meas: 0.00</div>
 
-        <div style="color:#aaa; font-size:0.8em;">Скорость Vx (Динамика)</div>
+        <div style="color:#aaa; font-size:0.9em; font-weight:bold;margin-bottom: 10px;">Скорость Vx:</div>
         <div class="chart-wrapper">
             <canvas id="chartVelX"></canvas>
             <button class="fs-btn" onclick="this.parentElement.requestFullscreen()">Полный экран</button>
         </div>
 
-        <div style="color:#aaa; font-size:0.8em;">Скорость Vy (Динамика)</div>
+        <div style="color:#aaa; font-size:0.9em; font-weight:bold;margin-bottom: 10px;">Скорость Vy:</div>
         <div class="chart-wrapper">
             <canvas id="chartVelY"></canvas>
             <button class="fs-btn" onclick="this.parentElement.requestFullscreen()">Полный экран</button>
         </div>
 
-        <div style="color:#aaa; font-size:0.8em;">Скорость Vz (Динамика)</div>
+        <div style="color:#aaa; font-size:0.9em; font-weight:bold;margin-bottom: 10px;">Скорость Vz:</div>
         <div class="chart-wrapper">
             <canvas id="chartVelZ"></canvas>
             <button class="fs-btn" onclick="this.parentElement.requestFullscreen()">Полный экран</button>
         </div>
 
-        <div style="color:#aaa; font-size:0.8em;">Ошибка Оценки X (Error)</div>
+        <div style="color:#aaa; font-size:0.9em; font-weight:bold;margin-bottom: 10px;">Ошибка оценки X:</div>
         <div class="chart-wrapper">
             <canvas id="chartErrX"></canvas>
             <button class="fs-btn" onclick="this.parentElement.requestFullscreen()">Полный экран</button>
         </div>
 
-        <div style="color:#aaa; font-size:0.8em;">Ошибка Оценки Y (Error)</div>
+        <div style="color:#aaa; font-size:0.9em; font-weight:bold;margin-bottom: 10px;">Ошибка оценки Y:</div>
         <div class="chart-wrapper">
             <canvas id="chartErrY"></canvas>
             <button class="fs-btn" onclick="this.parentElement.requestFullscreen()">Полный экран</button>
         </div>
 
-        <div style="color:#aaa; font-size:0.8em;">Ошибка Оценки Z (Error)</div>
+        <div style="color:#aaa; font-size:0.9em; font-weight:bold;margin-bottom: 10px;">Ошибка оценки Z:</div>
         <div class="chart-wrapper">
             <canvas id="chartErrZ"></canvas>
             <button class="fs-btn" onclick="this.parentElement.requestFullscreen()">Полный экран</button>
@@ -1138,18 +1162,26 @@
                         chart.options.plugins.zoom.zoom.drag.enabled = true;
                         chart.resize();
                         chart.update();
+
+                        // Показываем курсор в полноэкранном режиме
+                        chart.options.interaction = { mode: 'nearest', intersect: true };
+                        chart.update();
                     }
                 }
             } else {
-                // При выходе из полноэкранного - ресайз всех чартов на всякий случай
                 const charts = [cPosX, cVelX, cErrX, cPosY, cVelY, cErrY, cPosZ, cVelZ, cErrZ];
                 charts.forEach(chart => {
                     chart.options.plugins.zoom.zoom.wheel.enabled = false;
                     chart.options.plugins.zoom.zoom.pinch.enabled = false;
                     chart.options.plugins.zoom.zoom.drag.enabled = false;
+                    chart.options.interaction = { mode: 'nearest', intersect: false };
                     chart.resize();
                     chart.update();
                 });
+
+                // Скрываем тултип при выходе из полноэкранного режима
+                const tooltip = document.getElementById('fullscreen-tooltip');
+                if (tooltip) tooltip.style.display = 'none';
             }
         });
 
