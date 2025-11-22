@@ -4,8 +4,11 @@
 <head>
     <meta charset="UTF-8">
     <title>AUV Pro: Replay & Visuals</title>
+    <!-- Подключаем библиотеку графиков -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
     <style>
-        /* общий фон. тёмно-синий, будто как под водой. мб потом поменять на более светлый */
+        /* общий фон */
         body {
             margin: 0;
             overflow: hidden;
@@ -27,6 +30,32 @@
             flex-direction: column;
             z-index: 100;
             box-shadow: 10px 0 40px rgba(0, 0, 0, 0.5);
+        }
+
+        /* НОВАЯ ПАНЕЛЬ СПРАВА (ГРАФИКИ) */
+        .charts-ui {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 420px;
+            height: 100vh;
+            background: rgba(0, 25, 45, 0.9);
+            border-left: 1px solid #446688;
+            display: flex;
+            flex-direction: column;
+            z-index: 90;
+            padding: 10px;
+            overflow-y: auto;
+        }
+
+        .chart-wrapper {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid #446688;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            padding: 5px;
+            height: 200px;
+            position: relative;
         }
 
         .header {
@@ -56,7 +85,6 @@
             border: 1px solid #6688aa;
         }
 
-        /* вся область с прокрутой где джойстики и прочее г */
         .scroll-area {
             padding: 20px;
             overflow-y: auto;
@@ -95,12 +123,6 @@
             text-transform: uppercase;
         }
 
-        .btn-group {
-            display: flex;
-            gap: 10px;
-            width: 100%;
-        }
-
         button {
             flex: 1;
             padding: 10px;
@@ -112,6 +134,7 @@
             font-weight: bold;
             font-family: 'Segoe UI', sans-serif;
             transition: 0.2s;
+            width: 100%;
         }
 
         button:hover {
@@ -123,18 +146,12 @@
             animation: pulse 2s infinite;
         }
 
-        button:disabled {
-            background: #445566;
-            opacity: 0.5;
-        }
-
         @keyframes pulse {
             50% {
                 opacity: 0.8;
             }
         }
 
-        /* ползунки */
         input[type=range] {
             width: 100%;
             accent-color: #00aaff;
@@ -154,10 +171,6 @@
             background: rgba(0, 0, 0, 0.2);
             border-radius: 50%;
             border: 1px solid #446688;
-        }
-
-        .joy-bg {
-            fill: transparent;
         }
 
         .joy-axis-x {
@@ -266,7 +279,8 @@
             position: absolute;
             bottom: 20px;
             left: 400px;
-            right: 20px;
+            right: 440px;
+            /* Подвинул, чтобы не наезжать на графики */
             background: rgba(0, 30, 60, 0.9);
             padding: 15px 20px;
             border-radius: 8px;
@@ -304,7 +318,8 @@
         .legend {
             position: absolute;
             top: 20px;
-            right: 20px;
+            right: 440px;
+            /* Подвинул левее графиков */
             background: rgba(0, 30, 60, 0.85);
             padding: 15px;
             border-radius: 8px;
@@ -394,7 +409,6 @@
                             <input type="range" id="cmd_vz" class="vert-slider" min="-2" max="2" step="0.1" value="0">
                         </div>
                         <div style="font-size:0.7em; color:#0f0; margin-top:5px; font-weight:bold;">Z</div>
-                        <div style="font-size:0.7em; color:#aaa;"></div>
                     </div>
                 </div>
             </div>
@@ -407,10 +421,6 @@
                         <svg id="joy_current" width="140" height="140" class="joy-svg">
                             <line x1="70" y1="10" x2="70" y2="130" class="joy-axis-x" />
                             <line x1="10" y1="70" x2="130" y2="70" class="joy-axis-y" />
-                            <text x="70" y="20" class="joy-text" text-anchor="middle" fill="#ffaaaa">X+</text>
-                            <text x="70" y="135" class="joy-text" text-anchor="middle" fill="#ffaaaa">X-</text>
-                            <text x="5" y="75" class="joy-text" text-anchor="start" fill="#aaaaff">Y-</text>
-                            <text x="135" y="75" class="joy-text" text-anchor="end" fill="#aaaaff">Y+</text>
                             <circle cx="70" cy="70" r="12" fill="#00ffff" class="joy-handle" id="handle_current" />
                         </svg>
                         <div class="joy-val-text" id="val_current">X:0.0 Y:0.0</div>
@@ -421,7 +431,6 @@
                             <input type="range" id="drift_z" class="vert-slider" min="-1" max="1" step="0.1" value="0">
                         </div>
                         <div style="font-size:0.7em; color:#0f0; margin-top:5px;">Z</div>
-                        <div style="font-size:0.7em; color:#aaa;"></div>
                     </div>
                 </div>
             </div>
@@ -454,6 +463,58 @@
                 <div>Глубина: <span id="depth_val" style="color:#0f0; font-size:1.1em">0.00</span> м</div>
                 <div>Скорость: <span id="true_v" style="color:#fff">0.00</span> м/с</div>
             </div>
+        </div>
+    </div>
+
+    <!-- ПАНЕЛЬ ГРАФИКОВ -->
+    <div class="charts-ui">
+        <div style="color:#fff; border-bottom:1px solid #446688; padding-bottom:5px; margin-bottom:10px;">
+            МОНИТОРИНГ ФИЛЬТРА
+        </div>
+
+        <div style="color:#aaa; font-size:0.8em;">Координата X (Сравнение)</div>
+        <div class="chart-wrapper">
+            <canvas id="chartPosX"></canvas>
+        </div>
+
+        <div style="color:#aaa; font-size:0.8em;">Координата Y (Сравнение)</div>
+        <div class="chart-wrapper">
+            <canvas id="chartPosY"></canvas>
+        </div>
+
+        <div style="color:#aaa; font-size:0.8em;">Координата Z (Сравнение)</div>
+        <div class="chart-wrapper">
+            <canvas id="chartPosZ"></canvas>
+        </div>
+
+        <div style="color:#aaa; font-size:0.8em;">Скорость Vx (Динамика)</div>
+        <div class="chart-wrapper">
+            <canvas id="chartVelX"></canvas>
+        </div>
+
+        <div style="color:#aaa; font-size:0.8em;">Скорость Vy (Динамика)</div>
+        <div class="chart-wrapper">
+            <canvas id="chartVelY"></canvas>
+        </div>
+
+        <div style="color:#aaa; font-size:0.8em;">Скорость Vz (Динамика)</div>
+        <div class="chart-wrapper">
+            <canvas id="chartVelZ"></canvas>
+        </div>
+
+        <div style="color:#aaa; font-size:0.8em;">Ошибка Оценки X (Error)</div>
+        <div class="chart-wrapper">
+            <canvas id="chartErrX"></canvas>
+        </div>
+
+        <div style="color:#aaa; font-size:0.8em;">Ошибка Оценки Y (Error)</div>
+        <div class="chart-wrapper">
+            <canvas id="chartErrY"></canvas>
+        </div>
+
+        <div style="color:#aaa; font-size:0.8em;">Ошибка Оценки Z (Error)</div>
+        <div class="chart-wrapper">
+            <canvas id="chartErrZ"></canvas>
         </div>
     </div>
 
@@ -494,8 +555,125 @@
         import { MapControls } from 'three/addons/controls/MapControls.js';
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
+        // =========================================================
+        // 1. ИНИЦИАЛИЗАЦИЯ STATE (ВАЖНО! ДО ГРАФИКОВ)
+        // =========================================================
         const params = { cmd_vx: 0.0, cmd_vy: 0.0, cmd_vz: 0.0, drift_x: 0.0, drift_y: 0.0, drift_z: 0.0, noise: 0.5 };
         const state = { history: [], currentIdx: -1, isPlaying: false, timer: null };
+
+        // =========================================================
+        // 2. ИНИЦИАЛИЗАЦИЯ ГРАФИКОВ (Chart.js)
+        // =========================================================
+
+        // Массивы данных для графиков
+        const chartData = {
+            labels: [],
+            truePosX: [], measPosX: [], estPosX: [],
+            trueVelX: [], estVelX: [],
+            errX: [],
+            truePosY: [], measPosY: [], estPosY: [],
+            trueVelY: [], estVelY: [],
+            errY: [],
+            truePosZ: [], measPosZ: [], estPosZ: [],
+            trueVelZ: [], estVelZ: [],
+            errZ: []
+        };
+
+        // Плагин для вертикальной линии курсора
+        const cursorPlugin = {
+            id: 'cursorLine',
+            afterDraw: (chart) => {
+                // ТЕПЕРЬ STATE УЖЕ СУЩЕСТВУЕТ, ОШИБКИ НЕ БУДЕТ
+                if (state.currentIdx < 0) return;
+                const ctx = chart.ctx;
+                const xAxis = chart.scales.x;
+                const yAxis = chart.scales.y;
+                const x = xAxis.getPixelForValue(state.currentIdx);
+                if (x >= xAxis.left && x <= xAxis.right) {
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.moveTo(x, yAxis.top);
+                    ctx.lineTo(x, yAxis.bottom);
+                    ctx.lineWidth = 2;
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.setLineDash([5, 5]);
+                    ctx.stroke();
+                    ctx.restore();
+                }
+            }
+        };
+        Chart.register(cursorPlugin);
+        Chart.defaults.borderColor = '#446688';
+        Chart.defaults.color = '#88aacc';
+
+        // Функция создания конфига графика
+        function makeChart(id, datasets) {
+            const ctx = document.getElementById(id).getContext('2d');
+            return new Chart(ctx, {
+                type: 'line',
+                data: { labels: chartData.labels, datasets: datasets },
+                options: {
+                    responsive: true, maintainAspectRatio: false, animation: false,
+                    elements: { point: { radius: 0 } },
+                    scales: { x: { display: false }, y: { grid: { color: 'rgba(255,255,255,0.1)' } } }
+                }
+            });
+        }
+
+        const cPosX = makeChart('chartPosX', [
+            { label: 'True X', data: chartData.truePosX, borderColor: 'cyan', borderWidth: 2 },
+            { label: 'Est X', data: chartData.estPosX, borderColor: 'lime', borderWidth: 2 },
+            { label: 'Meas X', data: chartData.measPosX, borderColor: 'red', borderWidth: 0, pointRadius: 2, type: 'scatter' }
+        ]);
+
+        const cVelX = makeChart('chartVelX', [
+            { label: 'True Vx', data: chartData.trueVelX, borderColor: 'cyan', borderWidth: 2 },
+            { label: 'Est Vx', data: chartData.estVelX, borderColor: 'lime', borderWidth: 2, borderDash: [4, 4] }
+        ]);
+
+        const cErrX = makeChart('chartErrX', [
+            { label: 'Abs Error X', data: chartData.errX, borderColor: 'orange', backgroundColor: 'rgba(255, 165, 0, 0.2)', fill: true, borderWidth: 1 }
+        ]);
+
+        const cPosY = makeChart('chartPosY', [
+            { label: 'True Y', data: chartData.truePosY, borderColor: 'cyan', borderWidth: 2 },
+            { label: 'Est Y', data: chartData.estPosY, borderColor: 'lime', borderWidth: 2 },
+            { label: 'Meas Y', data: chartData.measPosY, borderColor: 'red', borderWidth: 0, pointRadius: 2, type: 'scatter' }
+        ]);
+
+        const cVelY = makeChart('chartVelY', [
+            { label: 'True Vy', data: chartData.trueVelY, borderColor: 'cyan', borderWidth: 2 },
+            { label: 'Est Vy', data: chartData.estVelY, borderColor: 'lime', borderWidth: 2, borderDash: [4, 4] }
+        ]);
+
+        const cErrY = makeChart('chartErrY', [
+            { label: 'Abs Error Y', data: chartData.errY, borderColor: 'orange', backgroundColor: 'rgba(255, 165, 0, 0.2)', fill: true, borderWidth: 1 }
+        ]);
+
+        const cPosZ = makeChart('chartPosZ', [
+            { label: 'True Z', data: chartData.truePosZ, borderColor: 'cyan', borderWidth: 2 },
+            { label: 'Est Z', data: chartData.estPosZ, borderColor: 'lime', borderWidth: 2 },
+            { label: 'Meas Z', data: chartData.measPosZ, borderColor: 'red', borderWidth: 0, pointRadius: 2, type: 'scatter' }
+        ]);
+
+        const cVelZ = makeChart('chartVelZ', [
+            { label: 'True Vz', data: chartData.trueVelZ, borderColor: 'cyan', borderWidth: 2 },
+            { label: 'Est Vz', data: chartData.estVelZ, borderColor: 'lime', borderWidth: 2, borderDash: [4, 4] }
+        ]);
+
+        const cErrZ = makeChart('chartErrZ', [
+            { label: 'Abs Error Z', data: chartData.errZ, borderColor: 'orange', backgroundColor: 'rgba(255, 165, 0, 0.2)', fill: true, borderWidth: 1 }
+        ]);
+
+        function updateChartsCursor() {
+            cPosX.draw(); cVelX.draw(); cErrX.draw();
+            cPosY.draw(); cVelY.draw(); cErrY.draw();
+            cPosZ.draw(); cVelZ.draw(); cErrZ.draw();
+        }
+
+        // =========================================================
+        // 3. ОСНОВНОЙ КОД
+        // =========================================================
 
         class Joystick {
             constructor(id, hId, tId, max, cb) {
@@ -651,6 +829,38 @@
             state.history.push(d);
             const i = state.history.length - 1;
 
+            // === ОБНОВЛЯЕМ ДАННЫЕ ГРАФИКОВ ===
+            chartData.labels.push(i);
+            chartData.truePosX.push(d.simulation.true_x);
+            chartData.measPosX.push(d.simulation.meas_x);
+            chartData.estPosX.push(d.estimation.est_x);
+            chartData.trueVelX.push(d.simulation.total_vx);
+            chartData.estVelX.push(d.estimation.est_vx);
+            chartData.errX.push(d.simulation.true_x - d.estimation.est_x);
+
+            chartData.truePosY.push(d.simulation.true_y);
+            chartData.measPosY.push(d.simulation.meas_y);
+            chartData.estPosY.push(d.estimation.est_y);
+            chartData.trueVelY.push(d.simulation.total_vy);
+            chartData.estVelY.push(d.estimation.est_vy);
+            chartData.errY.push(d.simulation.true_y - d.estimation.est_y);
+
+            chartData.truePosZ.push(d.simulation.true_z);
+            chartData.measPosZ.push(d.simulation.meas_z);
+            chartData.estPosZ.push(d.estimation.est_z);
+            chartData.trueVelZ.push(d.simulation.total_vz);
+            chartData.estVelZ.push(d.estimation.est_vz);
+            chartData.errZ.push(d.simulation.true_z - d.estimation.est_z);
+
+            // Обновляем графики не каждый кадр, а пачками (для оптимизации), но 
+            // так как у тебя скорость низкая (50ms), можно каждый 5-й.
+            if (i % 5 === 0) {
+                cPosX.update('none'); cVelX.update('none'); cErrX.update('none');
+                cPosY.update('none'); cVelY.update('none'); cErrY.update('none');
+                cPosZ.update('none'); cVelZ.update('none'); cErrZ.update('none');
+            }
+            // ==================================
+
             if (i < MAX) {
                 trT.p[i * 3] = d.simulation.true_x; trT.p[i * 3 + 1] = d.simulation.true_z; trT.p[i * 3 + 2] = d.simulation.true_y;
                 trE.p[i * 3] = d.estimation.est_x; trE.p[i * 3 + 1] = d.estimation.est_z; trE.p[i * 3 + 2] = d.estimation.est_y;
@@ -685,6 +895,10 @@
             }
         }
 
+        // =========================================================
+        // 4. ЭКСПОРТ В ГЛОБАЛ (ЧТОБЫ КНОПКИ РАБОТАЛИ)
+        // =========================================================
+
         window.togglePlay = () => {
             state.isPlaying = !state.isPlaying;
             const btn = document.getElementById('btn_play');
@@ -701,7 +915,7 @@
                 document.getElementById('timeline').disabled = false;
                 clearTimeout(state.timer);
             }
-        }
+        };
 
         window.singleStep = () => {
             if (state.currentIdx < state.history.length - 1) {
@@ -710,7 +924,7 @@
             } else {
                 ws.send(JSON.stringify(params));
             }
-        }
+        };
 
         window.seekStep = (dir) => {
             const newIdx = state.currentIdx + dir;
@@ -718,9 +932,9 @@
                 state.currentIdx = newIdx;
                 renderFrame();
             }
-        }
+        };
 
-        window.onTimelineInput = v => { state.currentIdx = parseInt(v); renderFrame(); }
+        window.onTimelineInput = v => { state.currentIdx = parseInt(v); renderFrame(); };
 
         function renderFrame() {
             const d = state.history[state.currentIdx];
@@ -737,6 +951,9 @@
             document.getElementById('depth_val').innerText = d.estimation.est_z.toFixed(2);
             document.getElementById('true_v').innerText = Math.hypot(d.simulation.total_vx, d.simulation.total_vy, d.simulation.total_vz).toFixed(2);
             updateTimelineUI();
+
+            // ОБНОВЛЕНИЕ КУРСОРА НА ГРАФИКЕ
+            updateChartsCursor();
         }
 
         function updateTimelineUI() {
