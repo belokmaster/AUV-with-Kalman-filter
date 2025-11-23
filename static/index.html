@@ -4,7 +4,6 @@
 <head>
     <meta charset="UTF-8">
     <title>AUV Pro: Replay & Visuals</title>
-    <!-- Подключаем библиотеку графиков -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
 
@@ -34,7 +33,6 @@
             border: none;
         }
 
-        /* НОВАЯ ПАНЕЛЬ СПРАВА (ГРАФИКИ) */
         .charts-ui {
             position: absolute;
             top: 0;
@@ -71,13 +69,11 @@
         .chart-wrapper canvas {
             flex-grow: 1;
             height: calc(100% - 30px);
-            /* Оставляем место для кнопки */
         }
 
         .fs-btn {
             position: absolute;
             bottom: 8px;
-            /* Чуть ниже от графика */
             right: 8px;
             padding: 6px 12px !important;
             font-size: 0.75em !important;
@@ -221,7 +217,6 @@
             transition: all 0.3s ease;
         }
 
-        /* Стиль для слайдера перемотки (как у шага) */
         #timeline {
             -webkit-appearance: none;
             appearance: none;
@@ -259,7 +254,6 @@
             transform: scale(1.05);
         }
 
-        /* Firefox */
         #timeline::-moz-range-track {
             height: 10px;
             border-radius: 8px;
@@ -307,7 +301,6 @@
             filter: drop-shadow(0 3px 8px rgba(0, 0, 0, 0.6));
         }
 
-        /* Внутренний блик, чтобы было похоже на ползунок скорости */
         #handle_thruster::after,
         #handle_current::after {
             content: '';
@@ -319,7 +312,6 @@
             pointer-events: none;
         }
 
-        /* Оси — приглушённые, чтобы не отвлекали */
         .joy-axis-x,
         .joy-axis-y {
             stroke-width: 2;
@@ -340,7 +332,7 @@
             color: #cceeff !important;
             background: rgba(10, 40, 70, 0.8) !important;
             border: 1px solid rgba(80, 150, 220, 0.3) !important;
-            border-radius: 6px;
+            border-radius: 16px;
             padding: 4px 8px;
             margin-top: 6px;
             box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
@@ -434,7 +426,6 @@
             transform: scale(1.05);
         }
 
-        /* Firefox */
         #noise::-moz-range-thumb,
         .pretty-slider::-moz-range-thumb {
             width: 20px;
@@ -520,18 +511,6 @@
             pointer-events: none;
             font-weight: bold;
             text-shadow: 1px 1px 0 #000;
-        }
-
-        .joy-val-text {
-            font-family: monospace;
-            font-size: 0.8em;
-            color: #88ccff;
-            margin-top: 8px;
-            background: #112233;
-            padding: 4px 8px;
-            border-radius: 4px;
-            width: 100px;
-            text-align: center;
         }
 
         .vert-col {
@@ -741,11 +720,11 @@
             /* Подвинул левее графиков */
             background: rgba(0, 30, 60, 0.85);
             padding: 15px;
-            border-radius: 8px;
+            border-radius: 16px;
             color: #fff;
             font-size: 0.85em;
-            border: 1px solid #446688;
             pointer-events: none;
+            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2) !important;
         }
 
         .dot {
@@ -776,12 +755,9 @@
         #show_charts_btn {
             position: absolute;
             top: 260px;
-            /* Располагаем под легендой */
             right: 440px;
-            /* Такое же смещение как у легенды */
             z-index: 100;
             display: none;
-            width: auto;
         }
 
         #show_charts_btn button {
@@ -789,6 +765,51 @@
             padding: 8px 15px;
             font-size: 0.9em;
             white-space: nowrap;
+        }
+
+        .big-play-btn {
+            background: #335c81 !important;
+            color: #cceeff !important;
+            font-size: 0.95em !important;
+            font-weight: bold !important;
+            padding: 10px 24px !important;
+            border-radius: 20px !important;
+            border: 1px solid rgba(100, 170, 230, 0.4) !important;
+            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2) !important;
+            transition: all 0.25s ease !important;
+            letter-spacing: 1.5px;
+            min-width: 120px;
+            backdrop-filter: blur(4px);
+            cursor: pointer;
+            font-family: 'Segoe UI', monospace;
+            text-align: center;
+        }
+
+        .big-play-btn:hover {
+            background: rgba(0, 190, 255, 0.35) !important;
+            color: #aaddff !important;
+            border-color: rgba(0, 200, 255, 0.6) !important;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3) !important;
+        }
+
+        .big-play-btn.stop {
+            background: rgba(214, 40, 40, 0.35) !important;
+            color: #ff8888 !important;
+            border-color: rgba(255, 70, 70, 0.5) !important;
+        }
+
+        .big-play-btn.stop:hover {
+            background: rgba(255, 60, 60, 0.45) !important;
+            color: #ffaaaa !important;
+            transform: translateY(-2px);
+        }
+
+        .charts-ui>div:first-child {
+            margin-top: 10px;
+            margin-bottom: 20px;
+            /* главное — расстояние под кнопкой */
+            text-align: center;
         }
     </style>
 
@@ -858,6 +879,10 @@
                         <svg id="joy_current" width="140" height="140" class="joy-svg">
                             <line x1="70" y1="10" x2="70" y2="130" class="joy-axis-x" />
                             <line x1="10" y1="70" x2="130" y2="70" class="joy-axis-y" />
+                            <text x="70" y="20" class="joy-text" text-anchor="middle" fill="#ffaaaa">X+</text>
+                            <text x="70" y="135" class="joy-text" text-anchor="middle" fill="#ffaaaa">X-</text>
+                            <text x="5" y="75" class="joy-text" text-anchor="start" fill="#aaaaff">Y-</text>
+                            <text x="135" y="75" class="joy-text" text-anchor="end" fill="#aaaaff">Y+</text>
                             <circle cx="70" cy="70" r="12" fill="#00ffff" class="joy-handle" id="handle_current" />
                         </svg>
                         <div class="joy-val-text" id="val_current">X:0.0 Y:0.0</div>
@@ -906,10 +931,10 @@
 
     <!-- ПАНЕЛЬ ГРАФИКОВ -->
     <div class="charts-ui">
-        <div
-            style="color:#fff; border-bottom:1px solid #446688; padding-bottom:5px; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;">
-            МОНИТОРИНГ ФИЛЬТРА
-            <button id="close_charts" style="width:auto; padding:5px 10px; font-size:0.8em;">Закрыть</button>
+        <div>
+            <button id="close_charts" class="big-play-btn stop">
+                Закрыть
+            </button>
         </div>
 
         <div style="color:#aaa; font-size:0.9em; font-weight:bold; margin-bottom: 10px;">Координата X:</div>
@@ -1014,9 +1039,9 @@
 
     <!-- КНОПКА ПОД ЛЕГЕНДОЙ -->
     <div id="show_charts_btn">
-        <button
-            onclick="document.querySelector('.charts-ui').style.display = 'flex'; document.getElementById('show_charts_btn').style.display = 'none';">Показать
-            графики</button>
+        <button id="btn_show_charts" class="big-play-btn">
+            ГРАФИКИ
+        </button>
     </div>
 
     <script type="module">
@@ -1027,11 +1052,6 @@
         const params = { cmd_vx: 0.0, cmd_vy: 0.0, cmd_vz: 0.0, drift_x: 0.0, drift_y: 0.0, drift_z: 0.0, noise: 0.5 };
         const state = { history: [], currentIdx: -1, isPlaying: false, timer: null };
 
-        // =========================================================
-        // 2. ИНИЦИАЛИЗАЦИЯ ГРАФИКОВ (Chart.js)
-        // =========================================================
-
-        // Массивы данных для графиков
         const chartData = {
             labels: [],
             truePosX: [], measPosX: [], estPosX: [],
@@ -1045,11 +1065,9 @@
             errZ: []
         };
 
-        // Плагин для вертикальной линии курсора
         const cursorPlugin = {
             id: 'cursorLine',
             afterDraw: (chart) => {
-                // ТЕПЕРЬ STATE УЖЕ СУЩЕСТВУЕТ, ОШИБКИ НЕ БУДЕТ
                 if (state.currentIdx < 0) return;
                 const ctx = chart.ctx;
                 const xAxis = chart.scales.x;
@@ -1072,7 +1090,6 @@
         Chart.defaults.borderColor = '#446688';
         Chart.defaults.color = '#88aacc';
 
-        // Функция создания конфига графика
         function makeChart(id, datasets) {
             const ctx = document.getElementById(id).getContext('2d');
             return new Chart(ctx, {
@@ -1150,7 +1167,6 @@
             cPosZ.draw(); cVelZ.draw(); cErrZ.draw();
         }
 
-        // Обработчик для ресайза чартов в полноэкранном режиме
         document.addEventListener('fullscreenchange', () => {
             if (document.fullscreenElement) {
                 const canvas = document.fullscreenElement.querySelector('canvas');
@@ -1163,7 +1179,6 @@
                         chart.resize();
                         chart.update();
 
-                        // Показываем курсор в полноэкранном режиме
                         chart.options.interaction = { mode: 'nearest', intersect: true };
                         chart.update();
                     }
@@ -1179,15 +1194,10 @@
                     chart.update();
                 });
 
-                // Скрываем тултип при выходе из полноэкранного режима
                 const tooltip = document.getElementById('fullscreen-tooltip');
                 if (tooltip) tooltip.style.display = 'none';
             }
         });
-
-        // =========================================================
-        // 3. ОСНОВНОЙ КОД
-        // =========================================================
 
         class Joystick {
             constructor(id, hId, tId, max, cb) {
@@ -1224,17 +1234,15 @@
             document.getElementById('val_noise').innerText = params.noise.toFixed(1);
         });
 
-        // Закрытие/открытие панели графиков
         document.getElementById('close_charts').onclick = () => {
             document.querySelector('.charts-ui').style.display = 'none';
             document.getElementById('show_charts_btn').style.display = 'block';
             document.querySelector('.timeline-bar').style.right = '20px';
             document.querySelector('.legend').style.right = '20px';
-            // Обновляем позицию кнопки при закрытии графиков
             document.getElementById('show_charts_btn').style.right = '20px';
         };
 
-        document.querySelector('#show_charts_btn button').onclick = () => {
+        document.getElementById('btn_show_charts').onclick = () => {
             document.querySelector('.charts-ui').style.display = 'flex';
             document.getElementById('show_charts_btn').style.display = 'none';
             document.querySelector('.timeline-bar').style.right = '440px';
@@ -1242,7 +1250,8 @@
         };
 
         const scene = new THREE.Scene();
-        const waterColor = 0x003b5e;
+        // ЦВЕТ ВОДЫ
+        const waterColor = 0x1d5a85;
         scene.background = new THREE.Color(waterColor);
         scene.fog = new THREE.FogExp2(waterColor, 0.003);
 
@@ -1267,7 +1276,9 @@
         scene.add(sun);
 
         const c = document.createElement('canvas'); c.width = c.height = 512; const ctx = c.getContext('2d');
-        ctx.fillStyle = '#C2B280'; ctx.fillRect(0, 0, 512, 512);
+        // ПЕСОК
+        ctx.fillStyle = '#fdf9b5';
+        ctx.fillRect(0, 0, 512, 512);
         const id = ctx.getImageData(0, 0, 512, 512);
         for (let i = 0; i < id.data.length; i += 4) { const n = (Math.random() - 0.5) * 40; id.data[i] += n; id.data[i + 1] += n; id.data[i + 2] += n; }
         ctx.putImageData(id, 0, 0);
@@ -1295,13 +1306,77 @@
         label("Z+", 0, 0, 0, "#0f0");
 
         const auv = new THREE.Group(); scene.add(auv);
-        const hull = new THREE.Mesh(new THREE.CapsuleGeometry(1, 4, 4, 16), new THREE.MeshStandardMaterial({ color: 0xffaa00 }));
-        hull.rotation.z = Math.PI / 2; hull.castShadow = true; auv.add(hull);
-        const spot = new THREE.SpotLight(0xffffff, 50, 60, 0.6, 0.5, 1);
-        spot.position.set(2, 0, 0); spot.target.position.set(10, 0, 0); auv.add(spot); auv.add(spot.target);
 
-        const pCount = 3000, pPos = new Float32Array(pCount * 3);
-        for (let i = 0; i < pCount * 3; i++)pPos[i] = (Math.random() - 0.5) * 250;
+        // Группа для визуальной части батискафа
+        const subGroup = new THREE.Group();
+        auv.add(subGroup);
+
+        const tankGeo = new THREE.CapsuleGeometry(1, 3.2, 4, 16);
+        const mainMat = new THREE.MeshStandardMaterial({ color: 0xffaa00, roughness: 0.3, metalness: 0.1 });
+        const hull = new THREE.Mesh(tankGeo, mainMat);
+        hull.rotation.z = Math.PI / 2;
+        hull.castShadow = true;
+        subGroup.add(hull);
+
+        const cockpit = new THREE.Mesh(
+            new THREE.SphereGeometry(1.25, 32, 32),
+            mainMat
+        );
+        cockpit.position.set(1.6, 0, 0);
+        subGroup.add(cockpit);
+
+        const glass = new THREE.Mesh(
+            new THREE.CircleGeometry(0.6, 32),
+            new THREE.MeshPhysicalMaterial({ color: 0x88ccff, roughness: 0.0, transmission: 0.6, thickness: 2 })
+        );
+        glass.rotation.y = Math.PI / 2;
+        glass.position.set(2.8, 0, 0);
+        subGroup.add(glass);
+
+        const tower = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.6, 0.7, 0.8, 16),
+            new THREE.MeshStandardMaterial({ color: 0xee9900 })
+        );
+        tower.position.set(-0.5, 1.1, 0);
+        subGroup.add(tower);
+
+        const ring = new THREE.Mesh(
+            new THREE.TorusGeometry(0.9, 0.1, 8, 24),
+            new THREE.MeshStandardMaterial({ color: 0x333333 })
+        );
+        ring.rotation.y = Math.PI / 2;
+        ring.position.set(-2.2, 0, 0);
+        subGroup.add(ring);
+
+        const nmCv = document.createElement('canvas');
+        const nmCx = nmCv.getContext('2d');
+        nmCv.width = 512; nmCv.height = 128;
+        nmCx.font = "900 50px 'Arial Black', sans-serif";
+        nmCx.fillStyle = "black";
+        nmCx.textAlign = "center"; nmCx.textBaseline = "middle";
+        nmCx.fillText("ГРОМОЗЕКА", 256, 64);
+
+        const namePlate = new THREE.Mesh(
+            new THREE.PlaneGeometry(3, 0.75),
+            new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(nmCv), transparent: true, opacity: 0.9 })
+        );
+
+        namePlate.position.set(0, 0.8, 1.02);
+
+        namePlate.rotation.z = -Math.PI / 2;
+        namePlate.rotation.y = -0.2;
+        hull.add(namePlate);
+
+        // Фонарь
+        const spot = new THREE.SpotLight(0xffffff, 80, 80, 0.5, 0.5, 1);
+        spot.position.set(2.5, 0, 0);
+        spot.target.position.set(15, 0, 0);
+        auv.add(spot);
+        auv.add(spot.target);
+
+        // частицы какашек в воде
+        const pCount = 50000, pPos = new Float32Array(pCount * 3);
+        for (let i = 0; i < pCount * 3; i++)pPos[i] = (Math.random() - 0.5) * 1000;
         const parts = new THREE.Points(new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(pPos, 3)),
             new THREE.PointsMaterial({ color: 0x88ccff, size: 0.2, transparent: true, opacity: 0.5 }));
         scene.add(parts);
@@ -1316,9 +1391,6 @@
         mMesh.count = 0; mMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage); scene.add(mMesh);
         const dummy = new THREE.Object3D();
 
-        // ==================================================================================
-        // ВИЗУАЛИЗАЦИЯ GIZMO (УЛУЧШЕННАЯ)
-        // ==================================================================================
         const gizmoContainer = document.getElementById('gizmo-container');
         const sceneMini = new THREE.Scene();
 
@@ -1342,7 +1414,6 @@
         lightMini.position.set(5, 5, 5);
         sceneMini.add(lightMini);
 
-        // Красивая сетка вместо осей (более тусклая, чтобы текст читался)
         const polarGrid = new THREE.PolarGridHelper(3, 8, 8, 64, 0x223344, 0x112233);
         sceneMini.add(polarGrid);
 
@@ -1355,19 +1426,14 @@
             sceneMini.add(line);
         }
 
-        const cX = 0xffaaaa; // Красный (Продольная)
-        const cY = 0xaaaaff; // Синий (Поперечная)
-        const cZ = 0xaaffaa; // Зеленый (Глубина)
+        const cX = 0xffaaaa;
+        const cY = 0xaaaaff;
+        const cZ = 0xaaffaa;
 
         drawMiniAxis(new THREE.Vector3(-3, 0, 0), new THREE.Vector3(3, 0, 0), cX);
-
-        // Ось Z симулятора (в ThreeJS это Y - вертикаль)
         drawMiniAxis(new THREE.Vector3(0, -3, 0), new THREE.Vector3(0, 3, 0), cZ);
-
-        // Ось Y симулятора (в ThreeJS это Z - глубина экрана)
         drawMiniAxis(new THREE.Vector3(0, 0, -3), new THREE.Vector3(0, 0, 3), cY);
 
-        // Текстовые метки с цветами из джойстика
         function addMiniLabel(txt, x, y, z, col) {
             const c = document.createElement('canvas'); const ctx = c.getContext('2d');
             ctx.font = "Bold 60px monospace"; const w = ctx.measureText(txt).width; c.width = w + 20; c.height = 70;
@@ -1377,41 +1443,31 @@
             sceneMini.add(s);
         }
 
-        // Цвета берем из SVG:
-        // X (Vertical Joy Axis): #ffaaaa (Light Red)
-        // Y (Horizontal Joy Axis): #aaaaff (Light Blue)
-        // Z (Depth): #aaffaa (Light Green - для комплекта RGB)
-
         const colX = "#ffaaaa";
         const colY = "#aaaaff";
         const colZ = "#aaffaa";
 
         addMiniLabel("X+", 2.8, 0, 0, colX);
         addMiniLabel("X-", -2.8, 0, 0, colX);
-
         addMiniLabel("Y+", 0, 0, 2.8, colY);
-        addMiniLabel("Y-", 0, 0, -2.8, colY);
-
+        addMiniLabel("Y-", 0, 0, -2.8, colY)
         addMiniLabel("Z+", 0, 2.2, 0, colZ);
 
-        // Лодка: полупрозрачная капсула (Стекло)
         const hullMat = new THREE.MeshPhysicalMaterial({
             color: 0x00aaff, transparent: true, opacity: 0.15,
             roughness: 0.1, metalness: 0.5, side: THREE.DoubleSide
         });
         const miniBoat = new THREE.Mesh(new THREE.CapsuleGeometry(0.2, 0.8, 4, 8), hullMat);
         miniBoat.rotation.z = Math.PI / 2;
-        // Добавляем внутреннее ребро жесткости для красоты
+
         const innerWire = new THREE.Mesh(new THREE.CapsuleGeometry(0.18, 0.78, 4, 4), new THREE.MeshBasicMaterial({ wireframe: true, color: 0x005588, transparent: true, opacity: 0.3 }));
         innerWire.rotation.z = Math.PI / 2;
         miniBoat.add(innerWire);
         sceneMini.add(miniBoat);
 
-        // Функция создания красивой 3D стрелки
         function createFatArrow(colorHex) {
             const group = new THREE.Group();
 
-            // Материал со свечением
             const mat = new THREE.MeshStandardMaterial({
                 color: colorHex,
                 emissive: colorHex,
@@ -1420,43 +1476,35 @@
                 metalness: 0.7
             });
 
-            // Стержень
             const shaftGeo = new THREE.CylinderGeometry(0.04, 0.04, 1, 12);
-            shaftGeo.translate(0, 0.5, 0); // Сдвиг, чтобы начало было в 0
+            shaftGeo.translate(0, 0.5, 0);
             const shaft = new THREE.Mesh(shaftGeo, mat);
-            shaft.scale.y = 1; // Будем менять длину через scale
+            shaft.scale.y = 1;
 
-            // Наконечник
             const headGeo = new THREE.ConeGeometry(0.12, 0.3, 16);
-            headGeo.translate(0, 0.15, 0); // Сдвиг центра
+            headGeo.translate(0, 0.15, 0);
             const head = new THREE.Mesh(headGeo, mat);
 
             group.add(shaft);
             group.add(head);
 
-            // Сохраняем ссылки для обновления
             group.userData = { shaft, head };
             sceneMini.add(group);
             return group;
         }
 
-        // Обновление стрелки (направление и длина)
         function updateFatArrow(arrowGroup, dirVec, length) {
             if (length < 0.05) {
                 arrowGroup.visible = false;
                 return;
             }
             arrowGroup.visible = true;
-            const len = Math.min(length, 3.0); // Ограничим визуальную длину
+            const len = Math.min(length, 3.0);
 
-            // Поворот: по дефолту объекты смотрят вверх (Y), нам нужно направить их по dirVec
-            // Используем quaternion
-            const axis = new THREE.Vector3(0, 1, 0); // Исходное направление стрелки
+            const axis = new THREE.Vector3(0, 1, 0);
             const quaternion = new THREE.Quaternion().setFromUnitVectors(axis, dirVec.clone().normalize());
             arrowGroup.setRotationFromQuaternion(quaternion);
 
-            // Масштабирование стержня
-            // Длина наконечника 0.3, остальное стержень
             const headLen = 0.3;
             const shaftLen = Math.max(0.01, len - headLen);
 
@@ -1464,9 +1512,9 @@
             arrowGroup.userData.head.position.y = shaftLen;
         }
 
-        const arrowCmd = createFatArrow(0xffd700); // Желтая
-        const arrowDrift = createFatArrow(0x00ffff); // Циан
-        const arrowTotal = createFatArrow(0x00ff00); // Зеленая
+        const arrowCmd = createFatArrow(0xffd700);
+        const arrowDrift = createFatArrow(0x00ffff);
+        const arrowTotal = createFatArrow(0x00ff00);
 
         const ws = new WebSocket("ws://" + location.host + "/ws");
         ws.onmessage = e => {
@@ -1474,7 +1522,6 @@
             state.history.push(d);
             const i = state.history.length - 1;
 
-            // === ОБНОВЛЯЕМ ДАННЫЕ ГРАФИКОВ ===
             chartData.labels.push(i);
             chartData.truePosX.push(d.simulation.true_x);
             chartData.measPosX.push(d.simulation.meas_x);
@@ -1497,14 +1544,11 @@
             chartData.estVelZ.push(d.estimation.est_vz);
             chartData.errZ.push(d.simulation.true_z - d.estimation.est_z);
 
-            // Обновляем графики не каждый кадр, а пачками (для оптимизации), но 
-            // так как у тебя скорость низкая (50ms), можно каждый 5-й.
             if (i % 5 === 0) {
                 cPosX.update('none'); cVelX.update('none'); cErrX.update('none');
                 cPosY.update('none'); cVelY.update('none'); cErrY.update('none');
                 cPosZ.update('none'); cVelZ.update('none'); cErrZ.update('none');
             }
-            // ==================================
 
             if (i < MAX) {
                 trT.p[i * 3] = d.simulation.true_x; trT.p[i * 3 + 1] = d.simulation.true_z; trT.p[i * 3 + 2] = d.simulation.true_y;
@@ -1539,10 +1583,6 @@
                 ws.send(JSON.stringify(params));
             }
         }
-
-        // =========================================================
-        // 4. ЭКСПОРТ В ГЛОБАЛ (ЧТОБЫ КНОПКИ РАБОТАЛИ)
-        // =========================================================
 
         window.togglePlay = () => {
             state.isPlaying = !state.isPlaying;
@@ -1597,12 +1637,10 @@
             document.getElementById('true_v').innerText = Math.hypot(d.simulation.total_vx, d.simulation.total_vy, d.simulation.total_vz).toFixed(2);
             updateTimelineUI();
 
-            // ОБНОВЛЕНИЕ ТЕКУЩИХ ЗНАЧЕНИЙ
             document.getElementById('currentPosX').innerText = `True: ${d.simulation.true_x.toFixed(2)} | Est: ${d.estimation.est_x.toFixed(2)} | Meas: ${d.simulation.meas_x.toFixed(2)}`;
             document.getElementById('currentPosY').innerText = `True: ${d.simulation.true_y.toFixed(2)} | Est: ${d.estimation.est_y.toFixed(2)} | Meas: ${d.simulation.meas_y.toFixed(2)}`;
             document.getElementById('currentPosZ').innerText = `True: ${d.simulation.true_z.toFixed(2)} | Est: ${d.estimation.est_z.toFixed(2)} | Meas: ${d.simulation.meas_z.toFixed(2)}`;
 
-            // ОБНОВЛЕНИЕ КУРСОРА НА ГРАФИКЕ
             updateChartsCursor();
         }
 
@@ -1625,15 +1663,12 @@
         });
 
         function updateGizmoVectors() {
-            // Команда
             const vCmd = new THREE.Vector3(params.cmd_vx, params.cmd_vz, params.cmd_vy);
             updateFatArrow(arrowCmd, vCmd, vCmd.length());
 
-            // Дрифт (течение)
             const vDrift = new THREE.Vector3(params.drift_x, params.drift_z, params.drift_y);
             updateFatArrow(arrowDrift, vDrift, vDrift.length());
 
-            // Итог
             const vTotal = new THREE.Vector3(params.cmd_vx + params.drift_x, params.cmd_vz + params.drift_z, params.cmd_vy + params.drift_y);
             updateFatArrow(arrowTotal, vTotal, vTotal.length());
         }
@@ -1672,6 +1707,7 @@
             renderer.render(scene, camera);
             rendererMini.render(sceneMini, cameraMini);
         }
+
         animate();
         window.onresize = () => {
             camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight);

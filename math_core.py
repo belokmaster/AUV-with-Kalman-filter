@@ -6,43 +6,63 @@ import math
 
 app = FastAPI()
 
-# ==========================================
-#  МАТРИЧНАЯ БИБЛИОТЕКА (Handmade / No NumPy)
-# ==========================================
-
+# нулевая матрица r x c 
 def zeros(rows, cols):
     return [[0.0 for _ in range(cols)] for _ in range(rows)]
 
+
+# единичная матрица n x n
 def eye(n):
     I = zeros(n, n)
     for i in range(n):
         I[i][i] = 1.0
+
     return I
+
 
 def mat_copy(A):
     return [row[:] for row in A]
 
+
 def mat_add(A, B):
-    r = len(A); c = len(A[0])
+    r = len(A)
+    c = len(A[0])
+
     C = zeros(r, c)
+
     for i in range(r):
         for j in range(c):
             C[i][j] = A[i][j] + B[i][j]
+
     return C
 
+
 def mat_sub(A, B):
-    r = len(A); c = len(A[0])
+    r = len(A)
+    c = len(A[0])
+
     C = zeros(r, c)
+
     for i in range(r):
         for j in range(c):
             C[i][j] = A[i][j] - B[i][j]
+
     return C
 
+
 def mat_mul(A, B):
-    # A: m x n, B: n x p -> C: m x p
-    m = len(A); n = len(A[0]); n2 = len(B); p = len(B[0])
-    # Простейшая проверка размерностей
-    if n != n2: return zeros(m, p) 
+    # A: m x n
+    # B: n x p
+    # C: m x p
+    m = len(A)
+    n = len(A[0])
+
+    n2 = len(B)
+    p = len(B[0])
+
+    if n != n2: 
+        return zeros(m, p) 
+    
     C = zeros(m, p)
     for i in range(m):
         ai = A[i]
@@ -51,16 +71,22 @@ def mat_mul(A, B):
             bk = B[k]
             for j in range(p):
                 C[i][j] += aik * bk[j]
+    
     return C
 
+
 def transpose(A):
-    r = len(A); c = len(A[0])
+    r = len(A)
+    c = len(A[0])
     T = zeros(c, r)
+
     for i in range(r):
         for j in range(c):
             T[j][i] = A[i][j]
+
     return T
 
+# умножение на скаляр
 def scalar_mult(A, s):
     r = len(A); c = len(A[0])
     B = zeros(r, c)
@@ -69,11 +95,12 @@ def scalar_mult(A, s):
             B[i][j] = A[i][j] * s
     return B
 
-# --- LUP Decomposition & Solver for Inversion ---
+# разбиваем матрицу на L, U и P
 def lup_decompose(A):
     n = len(A)
     LU = mat_copy(A)
     perm = list(range(n))
+
     for k in range(n):
         pivot = k
         maxv = abs(LU[k][k])
@@ -81,31 +108,35 @@ def lup_decompose(A):
             if abs(LU[i][k]) > maxv:
                 maxv = abs(LU[i][k])
                 pivot = i
+
         if maxv < 1e-12:
-            # Сингулярность (или близко к ней), просто вернем что есть
+            # для обработки выхода за пределы диапазона в питоне
             pass 
+
         if pivot != k:
             LU[k], LU[pivot] = LU[pivot], LU[k]
             perm[k], perm[pivot] = perm[pivot], perm[k]
+
         for i in range(k+1, n):
             if abs(LU[k][k]) > 1e-12:
                 LU[i][k] = LU[i][k] / LU[k][k]
                 for j in range(k+1, n):
                     LU[i][j] -= LU[i][k] * LU[k][j]
+
     return LU, perm
 
+# решаем систему LUx = Pb
 def lup_solve(LU, perm, b):
     n = len(LU)
-    # Permute b
     pb = [b[perm[i]] for i in range(n)]
-    # Forward (Ly = pb)
+
     y = [0.0]*n
     for i in range(n):
         s = pb[i]
         for k in range(i):
             s -= LU[i][k] * y[k]
         y[i] = s
-    # Backward (Ux = y)
+
     x = [0.0]*n
     for i in range(n-1, -1, -1):
         s = y[i]
@@ -115,6 +146,7 @@ def lup_solve(LU, perm, b):
             x[i] = s / LU[i][i]
         else:
             x[i] = 0.0
+
     return x
 
 def invert_matrix(A):
@@ -122,11 +154,13 @@ def invert_matrix(A):
     LU, perm = lup_decompose(A)
     invA = zeros(n, n)
     I = eye(n)
+
     for col in range(n):
         b = [I[i][col] for i in range(n)]
         x = lup_solve(LU, perm, b)
         for i in range(n):
             invA[i][col] = x[i]
+
     return invA
 
 def vec_to_col(v):
@@ -136,17 +170,14 @@ def col_to_vec(col):
     return [row[0] for row in col]
 
 
-# ==========================================
-#  Linear Kalman Filter (LKF)
-# ==========================================
 class LKF:
     def __init__(self, dt, process_noise, meas_noise):
         self.dt = dt
         # Состояние: [x, y, z, vx, vy, vz]
         self.x = vec_to_col([0.0, 0.0, 5.0, 0.0, 0.0, 0.0])
         
-        # Матрица перехода (Constant Velocity Model)
-        # x_new = x + vx*dt
+        # Матрица перехода
+        # x_new = x + v_x*dt
         self.F = eye(6)
         self.F[0][3] = dt; self.F[1][4] = dt; self.F[2][5] = dt
         
@@ -158,7 +189,6 @@ class LKF:
         self.P = scalar_mult(eye(6), 50.0)
         
         # Шум процесса Q (насколько мы не доверяем нашей модели "постоянной скорости")
-        # У нас теперь есть ускорение, которого модель не знает, поэтому Q нужен побольше
         self.Q = scalar_mult(eye(6), process_noise)
         
         # Шум измерений R
@@ -173,23 +203,26 @@ class LKF:
         FPFt = mat_mul(FP, transpose(self.F))
         self.P = mat_add(FPFt, self.Q)
         
-        # Ограничение, чтобы фильтр не улетал под землю (необязательно, но полезно для визуала)
+        # чтобы фильтр не улетал под песочек
         if self.x[2][0] < 0.0: self.x[2][0] = 0.0
             
         return col_to_vec(self.x)
 
     def update(self, z_meas):
-        z = vec_to_col(z_meas) # Измерения
+        z = vec_to_col(z_meas) 
         
-        # y = z - H * x (Innovation)
+        # y = z - H * x (Инновация)
+        # Разница между датчиком и ожиданием модели
         Hx = mat_mul(self.H, self.x)
         y = mat_sub(z, Hx)
         
-        # S = H * P * H^T + R (Innovation Covariance)
+        # S = H * P * H^T + R (Ковариация инновации)
+        # S показывает, насколько мы уверены в инновации
         HPHt = mat_mul(mat_mul(self.H, self.P), transpose(self.H))
         S = mat_add(HPHt, self.R)
         
-        # K = P * H^T * inv(S) (Kalman Gain)
+        # K = P * H^T * inv(S) (кожефициент Калмана)
+        # K показывает, насколько мы доверяем измерению по сравнению с моделью
         invS = invert_matrix(S)
         K = mat_mul(mat_mul(self.P, transpose(self.H)), invS)
         
@@ -206,42 +239,38 @@ class LKF:
         return col_to_vec(self.x)
 
 
-# ==========================================
-#  AUV Simulator (Dynamic Model)
-# ==========================================
 class AUVSimulator:
     def __init__(self, dt):
         self.dt = dt
-        self.pos = [0.0, 0.0, 5.0]   # Позиция (истина)
-        self.vel = [0.0, 0.0, 0.0]   # Скорость (в системе координат земли)
+        self.pos = [0.0, 0.0, 5.0]   # Позиция 
+        self.vel = [0.0, 0.0, 0.0]   # Скорость 
         
-        # Входы управления (Сила тяги)
+        # двигатель
         self.force_cmd = [0.0, 0.0, 0.0] 
-        # Вектор течения
+        # вектор течения
         self.drift_vel = [0.0, 0.0, 0.0]
         
         self.noise_std = 2.0
         self.radius = 1.0
 
-        # --- ФИЗИЧЕСКИЕ КОНСТАНТЫ ---
-        self.mass = 15.0        # Масса аппарата (кг). Создает инерцию.
+        self.mass = 15.0        # масса громозеки. Создает инерцию.
         self.drag_coeff = 3.0   # Коэф. вязкого трения (кг/с). Чем выше, тем труднее плыть.
         self.thrust_factor = 8.0 # Усиление джойстика (чтобы были силы побольше)
 
     def update_params(self, vx, vy, vz, dx, dy, dz, noise):
         # Интерпретируем вход джойстика как КОМАНДУ ТЯГИ, а не скорости
-        # vx, vy с джойстика обычно от -3 до 3
         self.force_cmd = [
             vx * self.thrust_factor, 
             vy * self.thrust_factor, 
             vz * self.thrust_factor
         ]
-        # Течение остается скоростью (упрощение)
+
+        # Течение остается скоростью
         self.drift_vel = [dx, dy, dz]
         self.noise_std = noise
 
     def step(self):
-        # Симуляция пошаговой физики: Эйлерово интегрирование
+        # Симуляция пошаговой физики
         
         # Истинная скорость относительно земли (для возврата)
         true_vel_vector = [0.0]*3 
@@ -268,7 +297,7 @@ class AUVSimulator:
             # 6. Интегрируем позицию: x = x0 + v_total * dt
             self.pos[i] += v_total * self.dt
 
-        # Обработка коллизии с "дном" (Z < radius)
+        # коллизия
         if self.pos[2] < self.radius:
             self.pos[2] = self.radius
             # Неупругое соударение - гасим вертикальную скорость и силу
@@ -297,13 +326,7 @@ class AUVSimulator:
         }
 
 
-# ==========================================
-#  FastAPI Setup
-# ==========================================
-
 dt = 0.1
-# Увеличим немного шум процесса в фильтре, так как модель движения (CV) 
-# теперь не идеально совпадает с реальностью (Accelerated Motion)
 sim = AUVSimulator(dt)
 kf = LKF(dt, process_noise=0.5, meas_noise=2.0)
 
