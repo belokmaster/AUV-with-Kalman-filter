@@ -46,10 +46,9 @@ def mat_mul(A, B):
     n2, p = len(B), len(B[0])
 
     if n != n2:
-        return zeros(m, p)
+        raise ValueError(f"Dimension mismatch: cols_A={n} != rows_B={n2}")
     
     C = zeros(m, p)
-
     for i in range(m):
         ai = A[i]
         for k in range(n):
@@ -63,8 +62,8 @@ def mat_mul(A, B):
 
 def transpose(A):
     r, c = len(A), len(A[0])
-    T = zeros(c, r)
 
+    T = zeros(c, r)
     for i in range(r):
         for j in range(c):
             T[j][i] = A[i][j]
@@ -74,8 +73,11 @@ def transpose(A):
 
 def scalar_mult(A, s):
     r, c = len(A), len(A[0])
-    B = zeros(r, c)
 
+    if len(s) !=  c:
+        raise ValueError(f"Dimension mismatch: cols_A={c} != len(s)={len(s)}")
+
+    B = zeros(r, c)
     for i in range(r):
         for j in range(c):
             B[i][j] = A[i][j] * s
@@ -83,7 +85,7 @@ def scalar_mult(A, s):
     return B
 
 
-def lup_decompose(A):
+def lup_decompose(A, epsilon=1e-12):
     n = len(A)
     LU = mat_copy(A)
     perm = list(range(n))
@@ -99,11 +101,13 @@ def lup_decompose(A):
             LU[k], LU[pivot] = LU[pivot], LU[k]
             perm[k], perm[pivot] = perm[pivot], perm[k]
 
-        if abs(LU[k][k]) > 1e-12:
-            for i in range(k + 1, n):
-                LU[i][k] /= LU[k][k]
-                for j in range(k + 1, n):
-                    LU[i][j] -= LU[i][k] * LU[k][j]
+        if abs(LU[k][k]) <= 1e-12:
+            raise ValueError("Matrix is singular (close to zero pivot)")
+
+        for i in range(k + 1, n):
+            LU[i][k] /= LU[k][k]
+            for j in range(k + 1, n):
+                LU[i][j] -= LU[i][k] * LU[k][j]
 
     return LU, perm
 
@@ -125,9 +129,7 @@ def lup_solve(LU, perm, b):
         s = y[i]
         for k in range(i + 1, n):
             s -= LU[i][k] * x[k]
-
-        if abs(LU[i][i]) > 1e-12:
-            x[i] = s / LU[i][i]
+        x[i] = s / LU[i][i]
 
     return x
 
@@ -135,6 +137,7 @@ def lup_solve(LU, perm, b):
 def invert_matrix(A):
     n = len(A)
     LU, perm = lup_decompose(A)
+
     invA = zeros(n, n)
     I = eye(n)
 
