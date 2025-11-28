@@ -36,7 +36,7 @@ func main() {
 	http.Handle("/", fs)
 	http.HandleFunc("/ws", handleWebSocket)
 
-	fmt.Printf("Server started at http://localhost%s\n", Port)
+	fmt.Printf("Сервер работает на http://localhost%s\n", Port)
 	log.Fatal(http.ListenAndServe(Port, nil))
 }
 
@@ -56,13 +56,13 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 		resp, err := http.Post(PythonServiceURL, "application/json", bytes.NewBuffer(message))
 		if err != nil {
-			log.Println("Python service unreachable:", err)
+			log.Println("Python не доступен:", err)
 			continue
 		}
 
 		var data ResponseData
 		if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
-			log.Println("Decode error:", err)
+			log.Println("Ошибка декодирования:", err)
 			resp.Body.Close()
 			continue
 		}
