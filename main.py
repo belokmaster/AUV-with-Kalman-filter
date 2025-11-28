@@ -84,6 +84,10 @@ def scalar_mult(A, s):
 
 def lup_decompose(A, epsilon=1e-12):
     n = len(A)
+
+    if len(A[0]) != n:
+        raise ValueError("Matrix must be square")
+
     LU = mat_copy(A)
     perm = list(range(n))
 
@@ -313,3 +317,4 @@ if __name__ == "__main__":
     print("Сервер запущен: http://127.0.0.1:8000")
 
     uvicorn.run(app, host="127.0.0.1", port=8000)
+
