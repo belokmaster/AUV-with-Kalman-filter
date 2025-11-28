@@ -74,9 +74,6 @@ def transpose(A):
 def scalar_mult(A, s):
     r, c = len(A), len(A[0])
 
-    if len(s) !=  c:
-        raise ValueError(f"Dimension mismatch: cols_A={c} != len(s)={len(s)}")
-
     B = zeros(r, c)
     for i in range(r):
         for j in range(c):
@@ -314,4 +311,5 @@ app.mount("/", StaticFiles(directory="static", html=True), name="static")
 
 if __name__ == "__main__":
     print("Сервер запущен: http://127.0.0.1:8000")
+
     uvicorn.run(app, host="127.0.0.1", port=8000)
