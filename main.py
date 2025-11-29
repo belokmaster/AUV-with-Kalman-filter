@@ -102,7 +102,7 @@ def lup_decompose(A, epsilon=1e-12):
             LU[k], LU[pivot] = LU[pivot], LU[k]
             perm[k], perm[pivot] = perm[pivot], perm[k]
 
-        if abs(LU[k][k]) <= 1e-12:
+        if abs(LU[k][k]) <= epsilon:
             raise ValueError("Matrix is singular (close to zero pivot)")
 
         for i in range(k + 1, n):
@@ -558,3 +558,4 @@ if __name__ == "__main__":
     print("Сервер запущен: http://127.0.0.1:8000")
 
     uvicorn.run(app, host="127.0.0.1", port=8000)
+
