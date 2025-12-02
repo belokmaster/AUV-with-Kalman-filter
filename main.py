@@ -1,6 +1,7 @@
 import uvicorn
 import random
 import math
+
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -81,7 +82,7 @@ def scalar_mult(A, s):
 
     return B
 
-
+# PA = LU
 def lup_decompose(A, epsilon=1e-12):
     n = len(A)
 
@@ -112,20 +113,23 @@ def lup_decompose(A, epsilon=1e-12):
 
     return LU, perm
 
-
+# решение Ax = b через LUP разложение
+# PA = LU
+# Сначала решается Ly=Pb, после Ux=y
 def lup_solve(LU, perm, b):
     n = len(LU)
     pb = [b[perm[i]] for i in range(n)]
-    y = [0.0] * n
 
+    # Ly = Pb
+    y = [0.0] * n
     for i in range(n):
         s = pb[i]
         for k in range(i):
             s -= LU[i][k] * y[k]
         y[i] = s
 
+    # решаем Ux = y
     x = [0.0] * n
-
     for i in range(n - 1, -1, -1):
         s = y[i]
         for k in range(i + 1, n):
@@ -134,7 +138,8 @@ def lup_solve(LU, perm, b):
 
     return x
 
-
+# обратная матрица через LUP разложение
+# AX=I
 def invert_matrix(A):
     n = len(A)
     LU, perm = lup_decompose(A)
@@ -145,12 +150,13 @@ def invert_matrix(A):
     for col in range(n):
         b = [I[i][col] for i in range(n)]
         x = lup_solve(LU, perm, b)
+
         for i in range(n):
             invA[i][col] = x[i]
 
     return invA
 
-
+# симметризирует матрицу для избежения ошибок
 def symmetrize(M):
     Mt = transpose(M)
     return scalar_mult(mat_add(M, Mt), 0.5)
@@ -166,197 +172,297 @@ def col_to_vec(col):
 
 class LKF:
     """
-    Линейный KF с augmented state:
-      x = [p_x,p_y,p_z,  v_x,v_y,v_z,  b_x,b_y,b_z]^T
+    Линейный Калмановский фильтр для состояния:
+        x = [p_x,p_y,p_z,  v_x,v_y,v_z,  b_x,b_y,b_z]^T
+        p - позиция, v - скорость, b - смещение акселерометра (bias)
 
-    Модель динамики (дискретная, с линейным drag):
-      a = (F - drag * v) / mass
-      v_{k+1} = v_k + a * dt
-      p_{k+1} = p_k + v_k*dt + 0.5 * a * dt^2
-      b_{k+1} = b_k  (random walk)
-    Управление: F (force vector, Н)
-    IMU измеряет: z_imu = a + b + noise = - (drag/m) v + (1/m) F + b + noise
-    Эхолокатор: z_pos = p + noise_pos
+    Дискретная модель движения с линейным сопротивлением (drag):
+        a = (F - drag * v) / mass
+
+        v_{k+1} = v_k + a * dt
+        p_{k+1} = p_k + v_k*dt + 0.5 * a * dt^2
+        b_{k+1} = b_k  (random walk)
+
+    Два типа датчиков:
+        1. IMU (Inertial Measurement Unit) - акселерометр. Он измеряет ускорение.
+        - Модель измерения IMU: z_imu = a_истинное + b + шум_imu
+        - Подставляя `a`, получаем: z_imu = (F/m - (drag/m)*v) + b + шум_imu
+        2. Эхолокатор (Sonar/Echosounder) - измеряет позицию.
+        - Модель измерения: z_pos = p_истинное + шум_pos
+    
+    Фильтр Калмана использует эти модели для получения оптимальной оценки состояния `x`
     """
 
     def __init__(self, dt, process_noise, meas_noise,
                  imu_noise=0.1, bias_walk=0.01, mass=15.0, drag_coeff=3.0):
         """
-        dt: шаг
-        process_noise: sigma_a (std шума ускорения) — для Q p/v-блока
-        meas_noise: sigma_pos (std эхолокатора, позиция)
-        imu_noise: sigma_imu (std акселерометра)
-        bias_walk: std блуждания bias (в единицах акселератора) (м/с^2 / sqrt(s))
-        mass, drag_coeff: модельные параметры (должны соответствовать симулятору)
+        Параметры:
+            - dt: шаг
+            - process_noise (sigma_a): стандартное отклонение шума процесса (немоделируемые ускорения).
+            - meas_noise (sigma_pos): стандартное отклонение шума измерения эхолокатора.
+            - imu_noise (sigma_imu): стандартное отклонение шума IMU.
+            - bias_walk: стандартное отклонение случайного блуждания смещения (bias).
+            - mass, drag_coeff: физические параметры модели.
         """
+
         self.dt = dt
 
-        self.mass = mass
-        self.drag = drag_coeff
+        self.mass = mass # масса громозяки
+        self.drag = drag_coeff # коэффицент сопротивления воды
 
         self.x = vec_to_col([0.0, 0.0, 5.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
 
-        self.F = zeros(9, 9)
-        self.B = zeros(9, 3)
+        self.F = zeros(9, 9) # F: [9x9] - Матрица перехода состояния.
+        self.B = zeros(9, 3) # B: [9x3] - Матрица управления.
         self._build_FB(dt, mass, drag_coeff)
 
-        # H_pos (3x9) для эхолокатора (позиция)
+        # H_pos: [3x9] - Матрица для измерения позиции. Связывает состояние `x` с измерением `z_pos`.
+        # z_pos = H_pos * x. Так как измеряем только позицию, H_pos = [I_3x3 | 0_3x3 | 0_3x3]
         self.H_pos = zeros(3, 9)
         for i in range(3):
             self.H_pos[i][i] = 1.0
 
-        # H_imu (3x9) для IMU: будет = [0, -drag/m * I3, I3]
+        # IMU это акселерометр
+        # H_imu: [3x9] - Матрица для измерения IMU.
         self.H_imu = zeros(3, 9)
         coef = - (drag_coeff / mass)
         for i in range(3):
             self.H_imu[i][3 + i] = coef  # maps v -> -drag/m * v
             self.H_imu[i][6 + i] = 1.0  # maps bias -> b
 
-        # начальная ковариация
-        self.P = scalar_mult(eye(9), 1e2)  # более крупная неопределённость
+        # P: [9x9] - Ковариационная матрица ошибки оценки.
+        # Показывает нашу "уверенность" в оценке `x`. Большие значения на диагонали
+        # означают высокую неопределенность.
+        self.P = scalar_mult(eye(9), 1e2)  
 
-        # Q: процессный шум
+        # Q: [9x9] - Ковариационная матрица шума процесса.
         # верхний-left 6x6 как ранее (p,v) из sigma_a
         # bias block (3x3) = (bias_walk^2 * dt) * I3
         self.sigma_a = process_noise
         self.bias_walk = bias_walk
         self.Q = self._build_Q(process_noise, bias_walk, dt)
 
-        # измерительные ковариации
+        # R: [3x3] - Ковариационные матрицы шума измерений.
+        # R_pos: [3x3] - для эхолокатора.
         self.R_pos = scalar_mult(eye(3), meas_noise * meas_noise)  # эхолокатор (побольше)
+        # R_imu: [3x3] - для IMU. акселерометр
         self.R_imu = scalar_mult(eye(3), imu_noise * imu_noise)  # IMU шума (меньше)
 
     def _build_FB(self, dt, mass, drag):
         """
-        Строим F и B по выводам:
-        p_{k+1} = p_k + alpha_p * v_k + beta_p * F
-        v_{k+1} = alpha_v * v_k + beta_v * F
-        b_{k+1} = b_k
-        где
-          alpha_v = 1 - (drag/mass)*dt
-          beta_v  = dt / mass
-          alpha_p = dt - 0.5*(drag/mass)*dt^2
-          beta_p  = 0.5 * dt^2 / mass
+        Построение матриц F и B, которые описывают детерминированную часть модели движения.
+            x_k = F * x_{k-1} + B * u_{k-1}
+
+        Вывод формул из непрерывной модели:
+            a = (F_u - drag * v) / mass
+            p_dot = v
+            v_dot = a
+
+        Дискретизация дает:
+          v_k = v_{k-1} + ( (F_u / m) - (drag/m)*v_{k-1} )*dt = (1 - (drag/m)*dt)*v_{k-1} + (dt/m)*F_u
+          p_k = p_{k-1} + v_{k-1}*dt + 0.5*a*dt^2
+              = p_{k-1} + v_{k-1}*dt + 0.5*((F_u/m) - (drag/m)*v_{k-1})*dt^2
+              = p_{k-1} + (dt - 0.5*(drag/m)*dt^2)*v_{k-1} + (0.5*dt^2/m)*F_u
+          
+          b_k = b_{k-1} (смешение меняется только за счет шума, не управления)
+        
+        Отсюда получаем коэффициенты для матриц F и B.
         """
         # нули
         self.F = zeros(9, 9)
         self.B = zeros(9, 3)
+        
+        # Коэффициенты, выведенные выше
         alpha_v = 1.0 - (drag / mass) * dt
         beta_v = dt / mass
         alpha_p = dt - 0.5 * (drag / mass) * (dt * dt)
         beta_p = 0.5 * (dt * dt) / mass
 
-        # p-rows
+        # Заполняем F (матрица перехода) и B (матрица управления)
+        # Блок для позиции (p_k = 1*p_{k-1} + alpha_p*v_{k-1} + beta_p*F_u)
         for i in range(3):
             self.F[i][i] = 1.0
-            self.F[i][3 + i] = alpha_p  # coefficient on v_k
-            # B for p
-            self.B[i][i] = beta_p
+            self.F[i][3 + i] = alpha_p  # p зависит от v
+            self.B[i][i] = beta_p # p зависит от F_u
 
-        # v-rows
+        # Блок для скорости (v_k = alpha_v*v_{k-1} + beta_v*F_u)
         for i in range(3):
-            self.F[3 + i][3 + i] = alpha_v
-            self.B[3 + i][i] = beta_v
+            self.F[3 + i][3 + i] = alpha_v # v зависит от v
+            self.B[3 + i][i] = beta_v # v зависит от F_u
 
-        # bias-rows (random walk)
+        # Блок для смещения (b_k = 1*b_{k-1})
         for i in range(3):
             self.F[6 + i][6 + i] = 1.0
-            # no B for bias
+
 
     def _build_Q(self, sigma_a, bias_walk, dt):
         """
-        Построение Q (9x9):
-         - для (p,v) используем структуру, зависящую от sigma_a (как ранее)
-         - для bias: variance = bias_walk^2 * dt (random walk дискретизация)
-         - cross-terms 0
+        Построение матрицы ковариации шума процесса Q.
+        Эта матрица моделирует неопределенность, которая добавляется на каждом шаге
+        из-за неточностей модели.
+
+        - Блок для (p, v) выводится из предположения о постоянном случайном ускорении
+          с дисперсией sigma_a^2 в течение интервала dt.
+        - Блок для смещения (bias) моделируется как случайное блуждание (random walk),
+          его дисперсия растет как (bias_walk^2 * dt).
         """
+
         dt2 = self.dt * self.dt
         dt3 = dt2 * self.dt
         dt4 = dt2 * dt2
+
+        # Коэффициенты для p,v блока
         a = dt4 / 4.0
         b = dt3 / 2.0
         c = dt2
         s2 = sigma_a * sigma_a
+
         Q = zeros(9, 9)
         for axis in range(3):
             pi = axis
             vi = 3 + axis
+
+            # Cov(p, p) = (dt^4/4) * sigma_a^2
             Q[pi][pi] = a * s2
+            # Cov(p, v) = (dt^3/2) * sigma_a^2
             Q[pi][vi] = b * s2
+            # Cov(v, p) = Cov(p, v)
             Q[vi][pi] = b * s2
+            # Cov(v, v) = (dt^2) * sigma_a^2
             Q[vi][vi] = c * s2
-        # bias block
+
+        # Заполняем диагональный блок для смещения (bias)
         bias_var = (bias_walk * bias_walk) * self.dt
         for i in range(3):
             Q[6 + i][6 + i] = bias_var
+
         return Q
 
     def predict(self, force_cmd=None):
         """
-        Прогноз состояния: x = F x + B force_cmd
-        force_cmd: [Fx,Fy,Fz] в Н (если None — считаем нулевым)
+        На этом шаге мы предсказываем состояние и его неопределенность на следующий момент времени,
+        используя только нашу модель движения (без новых измерений).
+        
+        1. Прогноз состояния (State Prediction):
+           x_k|k-1 = F * x_{k-1|k-1} + B * u_{k-1}
+           - x_k|k-1: прогноз состояния на шаг k, основанный на данных до шага k-1.
+           - x_{k-1|k-1}: оценка состояния на предыдущем шаге.
+           - u: вектор управления (сила).
+
+        2. Прогноз ковариации ошибки (Error Covariance Prediction):
+           P_k|k-1 = F * P_{k-1|k-1} * F^T + Q
+           - P_k|k-1: прогнозируемая ковариация.
+           - P_{k-1|k-1}: ковариация на предыдущем шаге.
+           - F * P * F^T: как неопределенность распространяется через нашу модель.
+           - Q: добавляем неопределенность из-за неточности модели.
         """
+
         if force_cmd is None:
             force_cmd = [0.0, 0.0, 0.0]
+        
+        # 1. Прогноз состояния: x_k|k-1 = F * x + B * u
+        # self.x: [9x1], F:[9x9], B:[9x3], u:[3x1]
         xu = mat_mul(self.F, self.x)  # 9x1
         bu = mat_mul(self.B, vec_to_col(force_cmd))  # 9x1
         self.x = mat_add(xu, bu)
-        # P = F P F^T + Q
+
+        # 2. Прогноз ковариации: P_k|k-1 = F * P * F^T + Q
+        # P: [9x9], F:[9x9], F^T:[9x9], Q:[9x9]
         self.P = mat_add(mat_mul(mat_mul(self.F, self.P), transpose(self.F)), self.Q)
+        
+        # Симметризуем P для численной стабильности
         self.P = symmetrize(self.P)
+
         return col_to_vec(self.x)
 
     def update_imu(self, imu_meas, force_cmd):
         """
         Обновление по IMU (высокая частота).
-        imu_meas: [ax_meas, ay_meas, az_meas] (в м/с^2)
-        force_cmd: [Fx,Fy,Fz] (в Н) — нужен, тк IMU измерение содержит + (1/m) * F
+            imu_meas: [ax_meas, ay_meas, az_meas] (в м/с^2)
+            force_cmd: [Fx,Fy,Fz] (в Н) — нужен, тк IMU измерение содержит + (1/m) * F
+
         Модель измерения:
           imu_meas - (1/m) * F = H_imu * x + noise
         где H_imu = [0, -drag/m I3, I3]
         """
-        # корректируем измерение вычитая известную часть (1/m)*F
+
+        # Модель измерения IMU: z_imu = (-drag/m * v + b) + (1/m) * F + noise
+        # Нам нужно "очистить" измерение от известного управляющего воздействия.
+        # z_tilde = z_imu - (1/m)*F = H_imu * x_истинное + noise
         F_term = [(1.0 / self.mass) * f for f in force_cmd]
         z_tilde = [imu_meas[i] - F_term[i] for i in range(3)]
 
-        z = vec_to_col(z_tilde)  # 3x1
+        z = vec_to_col(z_tilde)  # z: [3x1] - очищенное измерение
+
+        # 1. Вычисление невязки (Innovation):
+        #    y = z - H * x_k|k-1
+        #    y: [3x1] - разница между реальным измерением и предсказанным.
+        #    H_imu: [3x9], x: [9x1]
         y = mat_sub(z, mat_mul(self.H_imu, self.x))  # 3x1
 
+        # 2. Ковариация невязки (Innovation Covariance):
+        #    S = H * P_k|k-1 * H^T + R
+        #    S: [3x3] - неопределенность нашего предсказанного измерения.
+        #    P: [9x9], H_imu^T: [9x3], R_imu: [3x3]
         S = mat_add(mat_mul(mat_mul(self.H_imu, self.P), transpose(self.H_imu)), self.R_imu)
-        PHt = mat_mul(self.P, transpose(self.H_imu))  # 9x3
 
+        # 3. Вычисление коэффициента Калмана (Kalman Gain):
+        #    K = P_k|k-1 * H^T * S^{-1}
+        #    K: [9x3] - "оптимальный вес", который определяет, насколько сильно мы доверяем
+        #    новому измерению по сравнению с нашим прогнозом.
+        PHt = mat_mul(self.P, transpose(self.H_imu)) 
         S_inv = invert_matrix(S)
         K = mat_mul(PHt, S_inv)  # 9x3
 
+        # 4. Обновление оценки состояния (State Update):
+        #    x_k|k = x_k|k-1 + K * y
+        #    Корректируем наш прогноз на основе невязки, взвешенной с помощью K.
         self.x = mat_add(self.x, mat_mul(K, y))
 
-        # Joseph form
+        # 5. Обновление ковариации ошибки (Covariance Update) - ФОРМА ЙОЗЕФА:
+        #    P_k|k = (I - K*H) * P_k|k-1 * (I - K*H)^T + K * R * K^T
+        #    Эта форма более численно устойчива, чем стандартная P = (I - K*H)*P,
+        #    так как она гарантирует, что матрица P останется симметричной и
+        #    положительно определенной, предотвращая расходимость фильтра из-за ошибок округления.
         I9 = eye(9)
         KH = mat_mul(K, self.H_imu)
         temp = mat_sub(I9, KH)
         term1 = mat_mul(mat_mul(temp, self.P), transpose(temp))
         KRKt = mat_mul(mat_mul(K, self.R_imu), transpose(K))
         self.P = mat_add(term1, KRKt)
+
+        # Снова симметризуем для надежности
         self.P = symmetrize(self.P)
+
         return col_to_vec(self.x)
 
     def update_pos(self, z_meas):
         """
-        Обновление по позиции (эхо/сонар) — редкое измерение.
-        z_meas: [px,py,pz]
+        Этот метод полностью аналогичен `update_imu`, но использует другие матрицы:
+        - Матрицу измерения H_pos вместо H_imu.
+        - Ковариацию шума измерения R_pos вместо R_imu.
+        Все шаги (вычисление невязки, S, K, обновление x и P) идентичны по своей логике.
         """
-        z = vec_to_col(z_meas)
+
+        z = vec_to_col(z_meas) # z: [3x1] - измерение позиции
+
+        # 1. Невязка: y = z - H_pos * x
         y = mat_sub(z, mat_mul(self.H_pos, self.x))  # 3x1
 
+        # 2. Ковариация невязки: S = H_pos * P * H_pos^T + R_pos
         S = mat_add(mat_mul(mat_mul(self.H_pos, self.P), transpose(self.H_pos)), self.R_pos)
-        PHt = mat_mul(self.P, transpose(self.H_pos))  # 9x3
 
+        # 3. Коэффициент Калмана: K = P * H_pos^T * S^{-1}
+        PHt = mat_mul(self.P, transpose(self.H_pos))  # 9x3
         S_inv = invert_matrix(S)
         K = mat_mul(PHt, S_inv)  # 9x3
 
+        # 4. Обновление состояния: x = x + K * y
         self.x = mat_add(self.x, mat_mul(K, y))
 
-        # Joseph form
+        # 5. Обновление ковариации (Форма Йозефа)
+        #    P_k|k = (I - K*H) * P_k|k-1 * (I - K*H)^T + K * R * K^T
+        #    Эта форма более численно устойчива, чем стандартная P = (I - K*H)*P
         I9 = eye(9)
         KH = mat_mul(K, self.H_pos)
         temp = mat_sub(I9, KH)
@@ -364,26 +470,36 @@ class LKF:
         KRKt = mat_mul(mat_mul(K, self.R_pos), transpose(K))
         self.P = mat_add(term1, KRKt)
         self.P = symmetrize(self.P)
+
         return col_to_vec(self.x)
 
 
 class AUVSimulator:
+    """
+    Симулятор подводного аппарата для генерации "реальных" и "измеренных" данных.
+    Он моделирует физику движения и работу датчиков с шумами.
+    """
+
     def __init__(self, dt):
         self.dt = dt
-        self.pos = [0.0, 0.0, 5.0]
-        self.vel = [0.0, 0.0, 0.0]
+        # Истинное состояние аппарата
+        self.pos = [0.0, 0.0, 5.0] # [p_x, p_y, p_z]
+        self.vel = [0.0, 0.0, 0.0] # [v_x, v_y, v_z]
+
+        # Параметры управления и среды
         self.force_cmd = [0.0, 0.0, 0.0]
         self.drift_vel = [0.0, 0.0, 0.0]
         self.noise_std = 2.0            # sigma для позиционного эхолокатора
+
         self.radius = 1.0
         self.mass = 15.0
         self.drag_coeff = 3.0
-        self.thrust_factor = 8.0
+        self.thrust_factor = 8.0 # Коэффициент для преобразования команды в силу
 
-        # IMU параметры (реалистичный акселерометр)
-        self.imu_noise_std = 0.1         # std шума акселерометра (м/с^2)
-        self.imu_bias = [0.0, 0.0, 0.0]  # начальный bias (м/с^2)
-        self.imu_bias_walk_std = 0.01    # std random-walk bias (м/с^2 / sqrt(s))
+        # IMU параметры (акселерометр)
+        self.imu_noise_std = 0.1         # Шум измерения IMU
+        self.imu_bias = [0.0, 0.0, 0.0]  # Истинное смещение (bias)
+        self.imu_bias_walk_std = 0.01    # "Скорость" изменения смещения
 
         # счётчик шагов (можно использовать для редких обновлений)
         self.step_count = 0
@@ -394,8 +510,10 @@ class AUVSimulator:
         self.force_cmd = [vx * self.thrust_factor, vy * self.thrust_factor, vz * self.thrust_factor]
         self.drift_vel = [dx, dy, dz]
         self.noise_std = noise
+
         if imu_noise_std is not None:
             self.imu_noise_std = imu_noise_std
+
         if imu_bias_walk_std is not None:
             self.imu_bias_walk_std = imu_bias_walk_std
 
@@ -403,26 +521,32 @@ class AUVSimulator:
         self.step_count += 1
         true_vel_vector = [0.0] * 3
         acc_vector = [0.0] * 3
+
         for i in range(3):
             f_drag = -self.drag_coeff * self.vel[i]
             f_net = self.force_cmd[i] + f_drag
             acc = f_net / self.mass
             acc_vector[i] = acc
             self.vel[i] += acc * self.dt
+            # Полная скорость = скорость аппарата + скорость течения
             v_total = self.vel[i] + self.drift_vel[i]
             true_vel_vector[i] = v_total
             self.pos[i] += v_total * self.dt
 
+        # Ограничение по глубине (не может выплыть выше поверхности)
         if self.pos[2] < self.radius:
             self.pos[2] = self.radius
             if self.vel[2] < 0:
                 self.vel[2] = 0.0
 
-        # --- bias random-walk (масштабируем через sqrt(dt)) ---
+        # Имитация "дрейфа" смещения (bias) акселерометра
         for i in range(3):
+            # Генерация нормального шума через метод Бокса-Мюллера. устойчивое
             u1 = random.random()
             u2 = random.random()
-            if u1 < 1e-12: u1 = 1e-12
+            if u1 < 1e-12: 
+                u1 = 1e-12
+            
             z = math.sqrt(-2.0 * math.log(u1)) * math.cos(2 * math.pi * u2)
             self.imu_bias[i] += z * self.imu_bias_walk_std * math.sqrt(self.dt)
 
@@ -430,16 +554,18 @@ class AUVSimulator:
         def gauss(mu, sigma):
             u1 = random.random()
             u2 = random.random()
-            if u1 < 1e-12: u1 = 1e-12
+            if u1 < 1e-12: 
+                u1 = 1e-12
+
             z = math.sqrt(-2.0 * math.log(u1)) * math.cos(2 * math.pi * u2)
             return mu + z * sigma
 
-        # --- IMU измерение: true acc + bias + noise ---
+        # Измерение IMU = истинное ускорение + смещение + шум
         imu_acc = [0.0] * 3
         for i in range(3):
             imu_acc[i] = acc_vector[i] + self.imu_bias[i] + gauss(0.0, self.imu_noise_std)
 
-        # --- измерение позиции (эхо) — шумное ---
+        # Измерение позиции = истинная позиция + шум
         meas_noise = [gauss(0.0, self.noise_std) for _ in range(3)]
         meas_pos = [self.pos[i] + meas_noise[i] for i in range(3)]
 
@@ -484,14 +610,10 @@ def step_simulation(params: ControlParams):
 
     sim_data = sim.step()
 
-    # 1) predict: используем текущую силу (force_cmd в Н)
     kf.predict(force_cmd=sim.force_cmd)
 
-    # 2) update по IMU (высокая частота) — IMU noisy измерение
-    # передаём сам imu_meas и текущую силу (KF вычитает 1/m * F внутри)
     kf.update_imu(sim_data["imu_acc"], sim.force_cmd)
 
-    # 3) update по эхолокатору (позиция) — редкое, но в этом endpoint делаем сразу
     est = kf.update_pos([
         sim_data["meas_x"],
         sim_data["meas_y"],
@@ -549,6 +671,7 @@ async def websocket_endpoint(websocket: WebSocket):
 
     except WebSocketDisconnect:
         print("Клиент отключился")
+        
     except Exception as e:
         print(f"Ошибка в WebSocket: {e}")
 
